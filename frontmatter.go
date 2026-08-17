@@ -11,17 +11,28 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TitlePage is what the paper's title-page markdown carries: the metadata in
-// its YAML frontmatter, and the abstract in its body.
+// TitlePage is what the paper's title-page markdown carries: metadata in its
+// YAML frontmatter, and an abstract in one of two places.
+//
+// The papers write it differently. One states the abstract as a frontmatter
+// field, which is pandoc's own convention; the other marks it in the body with
+// a bold-italic run, so the retired build would not number it as a section.
+// Both are read, the frontmatter field winning when a page has both.
 type TitlePage struct {
 	Title    string `yaml:"title"`
 	Subtitle string `yaml:"subtitle"`
 	Date     string `yaml:"date"`
 	Author   string `yaml:"author"`
 
-	// Abstract is the body text below the frontmatter, with the abstract
-	// marker removed.
-	Abstract string `yaml:"-"`
+	// Abstract is the frontmatter field when the page states one, otherwise
+	// the body below the abstract marker.
+	Abstract string `yaml:"abstract"`
+
+	// Body is what remains below the frontmatter once the abstract is
+	// accounted for. A page whose abstract is a frontmatter field can still
+	// carry front matter in its body — an IEEEkeywords block, for instance —
+	// which is emitted after the abstract.
+	Body string `yaml:"-"`
 }
 
 var (
@@ -58,6 +69,12 @@ func ReadTitlePage(path string) (TitlePage, error) {
 	}
 
 	body := data[len(match[0]):]
+	if strings.TrimSpace(page.Abstract) != "" {
+		// The abstract came from the frontmatter, so whatever is in the body
+		// is something else and belongs after it.
+		page.Body = strings.TrimSpace(string(body))
+		return page, nil
+	}
 	if marker := abstractMarker.FindIndex(body); marker != nil {
 		body = body[marker[1]:]
 	}
@@ -118,6 +135,20 @@ func (p TitlePage) abstractBlock() (string, error) {
 		return "", fmt.Errorf("render abstract: %w", err)
 	}
 	return "\\begin{abstract}\n" + strings.TrimSpace(string(rendered)) + "\n\\end{abstract}\n", nil
+}
+
+// bodyBlock renders whatever the title page carries below its frontmatter when
+// the abstract did not come from there — a keywords block, typically. It is
+// converted rather than escaped so raw-LaTeX passthrough survives.
+func (p TitlePage) bodyBlock() (string, error) {
+	if strings.TrimSpace(p.Body) == "" {
+		return "", nil
+	}
+	rendered, err := markdownToTex([]byte(p.Body))
+	if err != nil {
+		return "", fmt.Errorf("render title page body: %w", err)
+	}
+	return strings.TrimSpace(string(rendered)) + "\n", nil
 }
 
 // acknowledgmentBlock renders the acknowledgments markdown as an unnumbered

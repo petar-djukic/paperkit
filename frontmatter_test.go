@@ -55,6 +55,52 @@ func TestReadTitlePageSplitsMetadataFromAbstract(t *testing.T) {
 	}
 }
 
+// The Proceedings paper states its abstract as a frontmatter field, pandoc's
+// own convention, and keeps an IEEEkeywords block in the body. The body must
+// not be mistaken for the abstract.
+func TestReadTitlePagePrefersTheFrontmatterAbstract(t *testing.T) {
+	path := writeTemp(t, "00-title-page.md", `---
+title: Autogenic Systems
+author: Petar Djukic
+abstract: |
+  Advances in code-generating AI are moving software toward systems
+  that evolve themselves.
+---
+
+`+"```{=latex}\n\\begin{IEEEkeywords}\nAutogenic systems, LLM agents.\n\\end{IEEEkeywords}\n```\n")
+
+	page, err := ReadTitlePage(path)
+	if err != nil {
+		t.Fatalf("ReadTitlePage() error: %v", err)
+	}
+	if !strings.HasPrefix(page.Abstract, "Advances in code-generating AI") {
+		t.Errorf("Abstract did not come from the frontmatter: %q", page.Abstract)
+	}
+	if strings.Contains(page.Abstract, "IEEEkeywords") {
+		t.Errorf("the keywords block was swallowed into the abstract:\n%s", page.Abstract)
+	}
+	if !strings.Contains(page.Body, "IEEEkeywords") {
+		t.Errorf("the keywords block was dropped instead of kept as body:\n%s", page.Body)
+	}
+}
+
+// The reference-architecture paper marks its abstract in the body instead, and
+// has nothing after it.
+func TestReadTitlePageFallsBackToTheBodyMarker(t *testing.T) {
+	path := writeTemp(t, "00-title-page.md", titlePageSource)
+
+	page, err := ReadTitlePage(path)
+	if err != nil {
+		t.Fatalf("ReadTitlePage() error: %v", err)
+	}
+	if !strings.HasPrefix(page.Abstract, "This document presents") {
+		t.Errorf("Abstract did not come from the body: %q", page.Abstract)
+	}
+	if page.Body != "" {
+		t.Errorf("body should be empty when the abstract came from it: %q", page.Body)
+	}
+}
+
 func TestReadTitlePageRejectsMissingFrontmatterAndTitle(t *testing.T) {
 	noFrontmatter := writeTemp(t, "a.md", "# Just a heading\n")
 	if _, err := ReadTitlePage(noFrontmatter); err == nil {

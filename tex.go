@@ -194,6 +194,13 @@ func documentBody(root string, config Config) (string, error) {
 		if abstract != "" {
 			body.WriteString("\n" + abstract)
 		}
+		extra, err := page.bodyBlock()
+		if err != nil {
+			return "", err
+		}
+		if extra != "" {
+			body.WriteString("\n" + extra)
+		}
 		body.WriteString("\n")
 	}
 
