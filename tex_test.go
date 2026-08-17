@@ -18,7 +18,7 @@ func TestGenerateTexWritesFragmentPerChapterAndSkeleton(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := GenerateTex(root, config); err != nil {
+	if _, err := GenerateTex(root, config); err != nil {
 		t.Fatalf("GenerateTex() error: %v", err)
 	}
 
@@ -49,7 +49,7 @@ func TestGenerateTexSkeletonInputsChaptersInConfigOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := GenerateTex(root, config); err != nil {
+	if _, err := GenerateTex(root, config); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,7 +78,7 @@ func TestGenerateTexRewritesBibliographyStyle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := GenerateTex(root, config); err != nil {
+	if _, err := GenerateTex(root, config); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ func TestGenerateTexIncludesVenuePreamble(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := GenerateTex(root, config); err != nil {
+	if _, err := GenerateTex(root, config); err != nil {
 		t.Fatal(err)
 	}
 	if main := readFile(t, root, "tex/main.tex"); !strings.Contains(main, `\usepackage{cuted}`) {

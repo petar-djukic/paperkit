@@ -25,36 +25,70 @@ const (
 // depends on helper macros it emits into its own preamble (\tightlist,
 // longtable setup, \pandocbounded); a hand-written skeleton compiles until a
 // chapter happens to use one of them.
-func GenerateTex(root string, config Config) error {
+//
+// Regeneration goes through reconcile, so LaTeX the author has hand-edited is
+// merged rather than overwritten. It returns one ChapterResult per chapter, and
+// when any chapter conflicts or cannot be reconciled the error wraps
+// ErrConflicts so a caller can report the detail and still fail the build.
+func GenerateTex(root string, config Config) ([]ChapterResult, error) {
 	texDir := filepath.Join(root, config.TexDir)
 	if err := os.MkdirAll(texDir, 0o755); err != nil {
-		return err
+		return nil, err
 	}
+
+	results := make([]ChapterResult, 0, len(config.Chapters))
+	needsAttention := 0
 	for _, chapter := range config.Chapters {
-		if err := generateChapter(root, config, chapter); err != nil {
-			return fmt.Errorf("%s: %w", chapter, err)
+		generated, err := generateChapter(root, config, chapter)
+		if err != nil {
+			return results, fmt.Errorf("%s: %w", chapter, err)
+		}
+		disposition, err := reconcile(root, config, chapter, generated)
+		if err != nil {
+			return results, fmt.Errorf("%s: %w", chapter, err)
+		}
+		results = append(results, ChapterResult{Chapter: chapter, Disposition: disposition})
+		if disposition == Conflicted || disposition == Orphaned {
+			needsAttention++
 		}
 	}
-	return generateSkeleton(root, config)
+
+	if err := generateSkeleton(root, config); err != nil {
+		return results, err
+	}
+	if needsAttention > 0 {
+		return results, fmt.Errorf("%d of %d chapters: %w", needsAttention, len(config.Chapters), ErrConflicts)
+	}
+	return results, nil
 }
 
-func generateChapter(root string, config Config, chapter string) error {
-	output := filepath.Join(root, config.TexDir, TexName(chapter))
+// generateChapter renders one chapter to LaTeX and returns the bytes. It
+// writes to a temporary file rather than into tex/ so the author's copy is
+// never touched before reconcile decides what should land there.
+func generateChapter(root string, config Config, chapter string) ([]byte, error) {
+	dir, err := os.MkdirTemp("", "paperkit-gen-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+
+	output := filepath.Join(dir, TexName(chapter))
 	args := []string{
 		"--natbib",
 		"--from", "markdown",
 		"--to", "latex",
 		"--wrap=preserve",
 		chapter,
-		"-o", filepath.Join(config.TexDir, TexName(chapter)),
+		"-o", output,
 	}
 	if err := runIn(root, "pandoc", args...); err != nil {
-		return fmt.Errorf("pandoc: %w", err)
+		return nil, fmt.Errorf("pandoc: %w", err)
 	}
-	if _, err := os.Stat(output); err != nil {
-		return fmt.Errorf("pandoc produced no output: %w", err)
+	generated, err := os.ReadFile(output)
+	if err != nil {
+		return nil, fmt.Errorf("pandoc produced no output: %w", err)
 	}
-	return nil
+	return generated, nil
 }
 
 // generateSkeleton produces tex/main.tex: pandoc's standalone preamble with
