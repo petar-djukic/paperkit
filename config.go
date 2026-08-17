@@ -14,9 +14,19 @@ import (
 
 // Config is a paper directory's build description, read from paper.yaml.
 type Config struct {
-	// Title names the paper in build output. It does not reach the PDF; the
-	// venue template owns the typeset title.
+	// Title names the paper in build output. The typeset title comes from the
+	// title page, not from here.
 	Title string `yaml:"title"`
+
+	// TitlePage is the markdown carrying the paper's title, author, and
+	// abstract — metadata in its frontmatter, abstract in its body. Optional:
+	// a paper that sets none builds with no title block, which is how the
+	// papers that have not adopted one yet keep working.
+	TitlePage string `yaml:"title_page"`
+
+	// Acknowledgments is markdown rendered as an unnumbered section before the
+	// bibliography. Optional.
+	Acknowledgments string `yaml:"acknowledgments"`
 
 	// Chapters lists the markdown sources in reading order. Order here is
 	// authoritative: the generated main.tex inputs them exactly as listed,
@@ -137,6 +147,17 @@ func (c Config) validate(root string) error {
 	for _, filter := range c.Filters {
 		if _, err := os.Stat(filepath.Join(root, filter)); err != nil {
 			return fmt.Errorf("filter %s: %w", filter, err)
+		}
+	}
+	for label, optional := range map[string]string{
+		"title page":      c.TitlePage,
+		"acknowledgments": c.Acknowledgments,
+	} {
+		if optional == "" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(root, optional)); err != nil {
+			return fmt.Errorf("%s %s: %w", label, optional, err)
 		}
 	}
 	return nil
