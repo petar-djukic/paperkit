@@ -118,9 +118,9 @@ func TestLoadConfigReportsUnreadableAndMalformed(t *testing.T) {
 
 func TestTexNameKeepsStem(t *testing.T) {
 	for chapter, want := range map[string]string{
-		"01-introduction.md":  "01-introduction.tex",
-		"10-appendix-a.md":    "10-appendix-a.tex",
-		"sub/02-agent.md":     "02-agent.tex",
+		"01-introduction.md": "01-introduction.tex",
+		"10-appendix-a.md":   "10-appendix-a.tex",
+		"sub/02-agent.md":    "02-agent.tex",
 		"00-title-page.text": "00-title-page.tex",
 	} {
 		if got := TexName(chapter); got != want {
