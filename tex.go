@@ -78,9 +78,9 @@ func generateChapter(root string, config Config, chapter string) ([]byte, error)
 		"--from", "markdown",
 		"--to", "latex",
 		"--wrap=preserve",
-		chapter,
-		"-o", output,
 	}
+	args = append(args, config.filterArgs()...)
+	args = append(args, chapter, "-o", output)
 	if err := runIn(root, "pandoc", args...); err != nil {
 		return nil, fmt.Errorf("pandoc: %w", err)
 	}
@@ -107,10 +107,16 @@ func generateSkeleton(root string, config Config) error {
 		// Explicit because the skeleton is read from stdout, where pandoc has
 		// no output filename to infer the format from.
 		"--to", "latex",
-		"--include-in-header=" + filepath.Join(root, config.Preamble),
+		// Relative to the paper directory, which is the command's working
+		// directory below; joining it with root as well would resolve it
+		// inside itself.
+		"--include-in-header=" + config.Preamble,
+		"-V", "documentclass=" + config.DocumentClass,
+		"-V", "classoption=" + config.ClassOptions,
 		"-V", "natbiboptions=numbers,sort&compress",
 		"-M", "bibliography=references",
 	}
+	args = append(args, config.filterArgs()...)
 	args = append(args, config.Chapters...)
 	args = append(args, "-o", "-")
 
@@ -132,8 +138,39 @@ func generateSkeleton(root string, config Config) error {
 	// pandoc hard-codes plainnat; the IEEE natbib style is IEEEtranN.
 	document = strings.Replace(document,
 		`\bibliographystyle{plainnat}`, `\bibliographystyle{IEEEtranN}`, 1)
+	document, err = setGraphicsPath(document, config)
+	if err != nil {
+		return err
+	}
 
 	return os.WriteFile(filepath.Join(root, config.TexDir, "main.tex"), []byte(document), 0o644)
+}
+
+// setGraphicsPath points graphicx at the paper directory and its figure
+// directory.
+//
+// Figure paths in the chapters are written relative to the paper directory
+// (fig/x.pdf, images/y.png) because that is where the markdown lives, but
+// latexmk runs in tex/ so those paths resolve a level too low. The declaration
+// goes in only when pandoc actually loaded graphicx, since \graphicspath is
+// undefined without it and a chapter set with no figures would stop compiling.
+func setGraphicsPath(document string, config Config) (string, error) {
+	if !strings.Contains(document, "graphicx") {
+		return document, nil
+	}
+	toRoot, err := filepath.Rel(config.TexDir, ".")
+	if err != nil {
+		return "", err
+	}
+	toRoot = filepath.ToSlash(toRoot) + "/"
+	declaration := fmt.Sprintf("\\graphicspath{{%s}{%s}}\n",
+		toRoot, toRoot+filepath.ToSlash(config.FigureDir)+"/")
+
+	index := strings.Index(document, beginDocument)
+	if index < 0 {
+		return "", fmt.Errorf("pandoc skeleton has no %s", beginDocument)
+	}
+	return document[:index] + declaration + document[index:], nil
 }
 
 func chapterInputs(config Config) (string, error) {

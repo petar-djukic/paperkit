@@ -40,6 +40,30 @@ type Config struct {
 
 	// Output is the PDF basename written into BuildDir.
 	Output string `yaml:"output"`
+
+	// DocumentClass and ClassOptions set the LaTeX class of the generated
+	// skeleton. IEEE venues want IEEEtran, whose two-column layout the papers
+	// are written against.
+	DocumentClass string `yaml:"document_class"`
+	ClassOptions  string `yaml:"class_options"`
+
+	// Bibliography is the shared CSL-YAML corpus, relative to the paper
+	// directory. Every paper cites from the one database at the repository
+	// root rather than keeping a private copy.
+	Bibliography string `yaml:"bibliography"`
+
+	// RefsTool converts that corpus to BibTeX, relative to the paper
+	// directory.
+	RefsTool string `yaml:"refs_tool"`
+
+	// Filters are pandoc Lua filters applied to every chapter and to the
+	// skeleton, relative to the paper directory.
+	//
+	// A two-column class needs them. Pandoc renders a markdown table as a
+	// longtable, and longtable refuses to run in two-column mode, so an
+	// IEEEtran paper with any table fails to compile until a filter rewrites
+	// those tables into table* floats.
+	Filters []string `yaml:"filters"`
 }
 
 // LoadConfig reads paper.yaml from root and applies defaults. A config naming
@@ -79,6 +103,18 @@ func (c *Config) applyDefaults() {
 	if c.Preamble == "" {
 		c.Preamble = filepath.Join("templates", "ieee-preamble.tex")
 	}
+	if c.DocumentClass == "" {
+		c.DocumentClass = "IEEEtran"
+	}
+	if c.ClassOptions == "" {
+		c.ClassOptions = "journal"
+	}
+	if c.Bibliography == "" {
+		c.Bibliography = filepath.Join("..", "references.yaml")
+	}
+	if c.RefsTool == "" {
+		c.RefsTool = filepath.Join("..", "cmd", "refs2bib")
+	}
 }
 
 func (c Config) validate(root string) error {
@@ -98,7 +134,23 @@ func (c Config) validate(root string) error {
 	if _, err := os.Stat(filepath.Join(root, c.Preamble)); err != nil {
 		return fmt.Errorf("preamble %s: %w", c.Preamble, err)
 	}
+	for _, filter := range c.Filters {
+		if _, err := os.Stat(filepath.Join(root, filter)); err != nil {
+			return fmt.Errorf("filter %s: %w", filter, err)
+		}
+	}
 	return nil
+}
+
+// filterArgs renders the configured filters as pandoc arguments. The paths stay
+// relative because pandoc runs with the paper directory as its working
+// directory.
+func (c Config) filterArgs() []string {
+	args := make([]string, 0, len(c.Filters)*2)
+	for _, filter := range c.Filters {
+		args = append(args, "--lua-filter="+filter)
+	}
+	return args
 }
 
 // TexName maps a chapter's markdown filename to its generated LaTeX

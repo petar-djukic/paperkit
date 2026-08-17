@@ -110,6 +110,33 @@ func TestGenerateTexIncludesVenuePreamble(t *testing.T) {
 	}
 }
 
+// A magefile passes "." as the paper root, so every path the package hands to
+// an external command has to be correct relative to that. Paths joined with
+// root and then run with root as the working directory resolve inside
+// themselves, which absolute-root tests cannot catch.
+func TestGenerateTexAcceptsRelativeRoot(t *testing.T) {
+	requirePandoc(t)
+	parent := t.TempDir()
+	root := filepath.Join(parent, "paper")
+	writeFile(t, root, "paper.yaml", "chapters:\n  - 01-first.md\n")
+	writeFile(t, root, filepath.Join("templates", "ieee-preamble.tex"), "% preamble\n")
+	writeFile(t, root, "01-first.md", "# First\n")
+
+	t.Chdir(parent)
+	config, err := LoadConfig("paper")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GenerateTex("paper", config); err != nil {
+		t.Fatalf("GenerateTex() with a relative root: %v", err)
+	}
+	for _, name := range []string{"paper/tex/01-first.tex", "paper/tex/main.tex"} {
+		if _, err := os.Stat(filepath.FromSlash(name)); err != nil {
+			t.Errorf("%s was not written: %v", name, err)
+		}
+	}
+}
+
 func TestSpliceBodyReportsUnrecognizedSkeleton(t *testing.T) {
 	for name, skeleton := range map[string]string{
 		"no begin":        `\documentclass{article}` + "\n" + `\bibliography{references}`,
