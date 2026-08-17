@@ -1,0 +1,140 @@
+package paperkit
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+// beginDocument and bibliographyLine bracket the region of pandoc's standalone
+// skeleton that holds the document body. The chapter inputs go between them.
+const (
+	beginDocument    = `\begin{document}`
+	bibliographyLine = `\bibliography{references}`
+)
+
+// GenerateTex writes one LaTeX fragment per chapter into the paper's tex
+// directory, plus a main.tex skeleton that inputs them in config order.
+//
+// Chapters are generated as fragments rather than standalone documents so the
+// author can hand-edit a chapter's floats without touching the preamble, and
+// so regenerating one chapter cannot disturb another. The skeleton comes from
+// pandoc rather than a template of our own because pandoc's body output
+// depends on helper macros it emits into its own preamble (\tightlist,
+// longtable setup, \pandocbounded); a hand-written skeleton compiles until a
+// chapter happens to use one of them.
+func GenerateTex(root string, config Config) error {
+	texDir := filepath.Join(root, config.TexDir)
+	if err := os.MkdirAll(texDir, 0o755); err != nil {
+		return err
+	}
+	for _, chapter := range config.Chapters {
+		if err := generateChapter(root, config, chapter); err != nil {
+			return fmt.Errorf("%s: %w", chapter, err)
+		}
+	}
+	return generateSkeleton(root, config)
+}
+
+func generateChapter(root string, config Config, chapter string) error {
+	output := filepath.Join(root, config.TexDir, TexName(chapter))
+	args := []string{
+		"--natbib",
+		"--from", "markdown",
+		"--to", "latex",
+		"--wrap=preserve",
+		chapter,
+		"-o", filepath.Join(config.TexDir, TexName(chapter)),
+	}
+	if err := runIn(root, "pandoc", args...); err != nil {
+		return fmt.Errorf("pandoc: %w", err)
+	}
+	if _, err := os.Stat(output); err != nil {
+		return fmt.Errorf("pandoc produced no output: %w", err)
+	}
+	return nil
+}
+
+// generateSkeleton produces tex/main.tex: pandoc's standalone preamble with
+// the chapter inputs spliced in place of the body.
+//
+// The skeleton is generated from the real chapters, not from an empty
+// document, because pandoc emits its preamble conditionally on what the
+// content uses: a chapter containing a table needs \usepackage{longtable}, one
+// containing an image needs graphicx, and pandoc only adds each when it sees
+// the feature. A skeleton built from an empty file compiles on its own and
+// then fails on the first chapter that uses a table.
+func generateSkeleton(root string, config Config) error {
+	args := []string{
+		"-s", "--natbib",
+		"--from", "markdown",
+		// Explicit because the skeleton is read from stdout, where pandoc has
+		// no output filename to infer the format from.
+		"--to", "latex",
+		"--include-in-header=" + filepath.Join(root, config.Preamble),
+		"-V", "natbiboptions=numbers,sort&compress",
+		"-M", "bibliography=references",
+	}
+	args = append(args, config.Chapters...)
+	args = append(args, "-o", "-")
+
+	command := exec.Command("pandoc", args...)
+	command.Dir = root
+	skeleton, err := command.Output()
+	if err != nil {
+		return fmt.Errorf("pandoc skeleton: %w", err)
+	}
+
+	body, err := chapterInputs(config)
+	if err != nil {
+		return err
+	}
+	document, err := spliceBody(string(skeleton), body)
+	if err != nil {
+		return err
+	}
+	// pandoc hard-codes plainnat; the IEEE natbib style is IEEEtranN.
+	document = strings.Replace(document,
+		`\bibliographystyle{plainnat}`, `\bibliographystyle{IEEEtranN}`, 1)
+
+	return os.WriteFile(filepath.Join(root, config.TexDir, "main.tex"), []byte(document), 0o644)
+}
+
+func chapterInputs(config Config) (string, error) {
+	var builder strings.Builder
+	for _, chapter := range config.Chapters {
+		name := TexName(chapter)
+		builder.WriteString(`\input{` + strings.TrimSuffix(name, ".tex") + "}\n")
+	}
+	if builder.Len() == 0 {
+		return "", fmt.Errorf("no chapters to input")
+	}
+	return builder.String(), nil
+}
+
+// spliceBody replaces the empty body of pandoc's skeleton with the chapter
+// inputs, leaving everything else — preamble, bibliography, end matter —
+// exactly as pandoc emitted it.
+func spliceBody(skeleton, body string) (string, error) {
+	start := strings.Index(skeleton, beginDocument)
+	if start < 0 {
+		return "", fmt.Errorf("pandoc skeleton has no %s", beginDocument)
+	}
+	start += len(beginDocument)
+	end := strings.Index(skeleton[start:], bibliographyLine)
+	if end < 0 {
+		return "", fmt.Errorf("pandoc skeleton has no %s", bibliographyLine)
+	}
+	end += start
+	return skeleton[:start] + "\n\n" + body + "\n" + skeleton[end:], nil
+}
+
+func runIn(dir, name string, args ...string) error {
+	command := exec.Command(name, args...)
+	command.Dir = dir
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command.Run()
+}
