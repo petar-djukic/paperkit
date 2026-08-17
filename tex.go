@@ -1,6 +1,7 @@
 package paperkit
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -127,7 +128,7 @@ func generateSkeleton(root string, config Config) error {
 		return fmt.Errorf("pandoc skeleton: %w", err)
 	}
 
-	body, err := chapterInputs(config)
+	body, err := documentBody(root, config)
 	if err != nil {
 		return err
 	}
@@ -173,6 +174,45 @@ func setGraphicsPath(document string, config Config) (string, error) {
 	return document[:index] + declaration + document[index:], nil
 }
 
+// documentBody assembles everything between \begin{document} and the
+// bibliography: the title block and abstract, the chapter inputs, and the
+// acknowledgment. The title page and acknowledgments are optional, so a paper
+// that configures neither gets exactly the chapter inputs.
+func documentBody(root string, config Config) (string, error) {
+	var body strings.Builder
+
+	if config.TitlePage != "" {
+		page, err := ReadTitlePage(filepath.Join(root, config.TitlePage))
+		if err != nil {
+			return "", err
+		}
+		body.WriteString(page.titleBlock())
+		abstract, err := page.abstractBlock()
+		if err != nil {
+			return "", err
+		}
+		if abstract != "" {
+			body.WriteString("\n" + abstract)
+		}
+		body.WriteString("\n")
+	}
+
+	inputs, err := chapterInputs(config)
+	if err != nil {
+		return "", err
+	}
+	body.WriteString(inputs)
+
+	if config.Acknowledgments != "" {
+		acknowledgment, err := acknowledgmentBlock(filepath.Join(root, config.Acknowledgments))
+		if err != nil {
+			return "", err
+		}
+		body.WriteString("\n" + acknowledgment)
+	}
+	return body.String(), nil
+}
+
 func chapterInputs(config Config) (string, error) {
 	var builder strings.Builder
 	for _, chapter := range config.Chapters {
@@ -183,6 +223,25 @@ func chapterInputs(config Config) (string, error) {
 		return "", fmt.Errorf("no chapters to input")
 	}
 	return builder.String(), nil
+}
+
+// markdownToTex converts a fragment of markdown, used for the abstract and the
+// acknowledgment, which are prose rather than metadata.
+func markdownToTex(markdown []byte) ([]byte, error) {
+	command := exec.Command("pandoc",
+		"--natbib",
+		"--from", "markdown",
+		"--to", "latex",
+		"--wrap=preserve",
+	)
+	command.Stdin = bytes.NewReader(markdown)
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		return nil, fmt.Errorf("pandoc: %w: %s", err, stderr.String())
+	}
+	return stdout.Bytes(), nil
 }
 
 // spliceBody replaces the empty body of pandoc's skeleton with the chapter
