@@ -21,13 +21,19 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
+	"golang.org/x/text/unicode/norm"
 	"gopkg.in/yaml.v3"
 )
 
@@ -50,11 +56,113 @@ func normalizeNames(v interface{}) interface{} {
 		m, ok := n.(map[string]interface{})
 		if ok && truthy(m["family"]) && !truthy(m["given"]) && !truthy(m["literal"]) {
 			out = append(out, map[string]interface{}{"literal": m["family"]})
-		} else {
-			out = append(out, n)
+			continue
 		}
+		out = append(out, n)
 	}
 	return out
+}
+
+// accentCommand maps a combining mark to the LaTeX accent that produces it.
+var accentCommand = map[rune]string{
+	0x0301: `\'`, 0x0300: "\\`", 0x0302: `\^`, 0x0308: `\"`, 0x0303: `\~`,
+	0x0304: `\=`, 0x0306: `\u`, 0x0307: `\.`, 0x030A: `\r`, 0x030B: `\H`,
+	0x030C: `\v`, 0x0327: `\c`, 0x0328: `\k`,
+}
+
+// strokedLetter covers the letters that carry no combining mark to decompose,
+// so no accent command can be derived for them.
+var strokedLetter = map[rune]string{
+	'Ł': `\L`, 'ł': `\l`, 'Ø': `\O`, 'ø': `\o`, 'Đ': `\DJ`, 'đ': `\dj`,
+	'Æ': `\AE`, 'æ': `\ae`, 'Œ': `\OE`, 'œ': `\oe`, 'ß': `\ss`,
+}
+
+// protectInitial rewrites a non-ASCII first character as its LaTeX accent
+// form, so "Éric" becomes "{\'E}ric" and "Łukasz" becomes "{\L}ukasz".
+//
+// IEEEtranN.bst abbreviates a given name to its initial, and bibtex is
+// byte-oriented: it takes the first byte of "Éric", half of a two-byte
+// character, and the .bbl becomes invalid UTF-8. xelatex then reports `Invalid
+// UTF-8 byte or sequence` and sets a replacement glyph where the initial
+// belongs.
+//
+// Bracing the character alone does not help. bibtex treats a group as one
+// token only when it opens with a control sequence, so {É} is still split byte
+// by byte; {\'E} is not. That is why this converts rather than merely wraps.
+//
+// The conversion is derived from Unicode decomposition rather than a table of
+// whole characters, so any letter that decomposes to a base plus a mark this
+// map knows is handled without being listed. Anything left unconvertible is
+// returned untouched, which is the behaviour before this existed.
+func protectInitial(given string) string {
+	trimmed := strings.TrimSpace(given)
+	if trimmed == "" || strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, `\`) {
+		return given
+	}
+	first, width := utf8.DecodeRuneInString(trimmed)
+	command, ok := latexInitial(first)
+	if !ok {
+		return given
+	}
+	return command + trimmed[width:]
+}
+
+// latexInitial gives the braced LaTeX form of a single non-ASCII letter, and
+// reports whether one could be derived.
+func latexInitial(first rune) (string, bool) {
+	if first == utf8.RuneError || first < utf8.RuneSelf {
+		return "", false
+	}
+	if command, known := strokedLetter[first]; known {
+		return "{" + command + "}", true
+	}
+	runes := []rune(norm.NFD.String(string(first)))
+	if len(runes) == 2 {
+		if command, known := accentCommand[runes[1]]; known {
+			// A control sequence named with letters, \c or \v, needs a space
+			// before the base letter or TeX reads them as one longer name.
+			// One named with punctuation, \' or \", does not.
+			separator := ""
+			if last, _ := utf8.DecodeLastRuneInString(command); unicode.IsLetter(last) {
+				separator = " "
+			}
+			return "{" + command + separator + string(runes[0]) + "}", true
+		}
+	}
+	return "", false
+}
+
+// givenInitial matches the first character of a given name inside a BibTeX
+// author list, where names are written "Family, Given" and separated by "and".
+// Anchoring on the comma is what makes this work across a wrapped field: the
+// separator between names may carry a newline, but "Family," never does.
+var givenInitial = regexp.MustCompile(`,(\s+)([^\x00-\x7F])`)
+
+// protectAccentedInitials rewrites the first character of every given name in
+// the generated BibTeX from a non-ASCII letter to its LaTeX accent form.
+//
+// It runs on the file rather than on the CSL data because pandoc's bibtex
+// writer escapes whatever it is handed: braces become \{ and \}, and a
+// backslash becomes \textbackslash, so anything injected upstream arrives as
+// literal text. After pandoc is the only place the substitution survives.
+func protectAccentedInitials(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	fixed := givenInitial.ReplaceAllFunc(data, func(match []byte) []byte {
+		parts := givenInitial.FindSubmatch(match)
+		first, _ := utf8.DecodeRune(parts[2])
+		command, ok := latexInitial(first)
+		if !ok {
+			return match
+		}
+		return []byte("," + string(parts[1]) + command)
+	})
+	if bytes.Equal(fixed, data) {
+		return nil
+	}
+	return os.WriteFile(path, fixed, 0o644)
 }
 
 // truthy mirrors Python's dict.get(k) coupled with `if value` semantics for
@@ -151,6 +259,10 @@ func main() {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "refs2bib: pandoc:", err)
+		os.Exit(1)
+	}
+	if err := protectAccentedInitials(*outPath); err != nil {
+		fmt.Fprintln(os.Stderr, "refs2bib:", err)
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s (%d entries) from %s\n", *outPath, len(entries), *yamlPath)
