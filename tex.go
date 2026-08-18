@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -89,7 +90,56 @@ func generateChapter(root string, config Config, chapter string) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("pandoc produced no output: %w", err)
 	}
-	return generated, nil
+	source, err := os.ReadFile(filepath.Join(root, chapter))
+	if err != nil {
+		return nil, err
+	}
+	return namespaceLabels(generated, source, chapter), nil
+}
+
+var (
+	// An identifier the author wrote in the markdown, as {#chapter-agent-view}.
+	explicitIdentifier = regexp.MustCompile(`\{#([A-Za-z0-9_:.-]+)\}`)
+	labelCommand       = regexp.MustCompile(`\\label\{([^}]+)\}`)
+	// Anything the LaTeX points at: \ref{x}, \autoref{x}, \hyperref[x]{...}.
+	referenceCommand = regexp.MustCompile(`\\(?:auto|page|name)?ref\{([^}]+)\}|\\hyperref\[([^\]]+)\]`)
+)
+
+// namespaceLabels prefixes the labels pandoc derived from heading text with the
+// chapter stem, leaving identifiers the author wrote alone.
+//
+// Pandoc makes a label unique within one conversion, and paperkit converts each
+// chapter separately, so every chapter that opens with "Introduction" produces
+// \label{introduction} and LaTeX reports the collision. The retired build
+// assembled the chapters into one document first and never saw this.
+//
+// A label is left alone when the author wrote its identifier in the markdown,
+// or when something in this chapter points at it. The first covers the anchors
+// chapters cross-reference — #chapter-agent-view, #tab-intent-object — and the
+// second covers anchors a filter mints rather than the author, such as the
+// #fig-<stem> figure anchors. Prefixing either would turn a working
+// cross-reference into a dangling one.
+func namespaceLabels(generated, source []byte, chapter string) []byte {
+	keep := make(map[string]bool)
+	for _, match := range explicitIdentifier.FindAllSubmatch(source, -1) {
+		keep[string(match[1])] = true
+	}
+	for _, match := range referenceCommand.FindAllSubmatch(generated, -1) {
+		for _, group := range match[1:] {
+			if len(group) > 0 {
+				keep[string(group)] = true
+			}
+		}
+	}
+	stem := strings.TrimSuffix(filepath.Base(chapter), filepath.Ext(chapter))
+
+	return labelCommand.ReplaceAllFunc(generated, func(match []byte) []byte {
+		name := string(labelCommand.FindSubmatch(match)[1])
+		if keep[name] || strings.HasPrefix(name, stem+":") {
+			return match
+		}
+		return []byte(`\label{` + stem + ":" + name + `}`)
+	})
 }
 
 // generateSkeleton produces tex/main.tex: pandoc's standalone preamble with
