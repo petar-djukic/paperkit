@@ -1,9 +1,8 @@
 // Command genoutline generates outline.tex from the SRDs (GH-94, ported from
 // gen_outline.py in GH-217).
 //
-// Reads <docs>/../00-front-matter.md (the abstract's source of record),
-// <docs>/VISION.yaml (goals), <docs>/constitutions/argument.yaml
-// (the title of record) and <docs>/srd/*.yaml (units in
+// Reads <docs>/../00-front-matter.md (the title of record and the abstract's
+// source of record), <docs>/VISION.yaml (goals) and <docs>/srd/*.yaml (units in
 // reading order) and emits a two-column IEEEtran outline document: per unit,
 // its goal sentence and the specific subgoals (each with an id G<n>.<m>
 // pointing at paper goal G<n>), and its content (the objective as a lead-in,
@@ -115,32 +114,29 @@ func startedDisplay(v interface{}) string {
 	return s
 }
 
-// loadFrontMatterAbstract reads the abstract from the pandoc YAML metadata
-// block at the top of 00-front-matter.md, the abstract's source of record
-// (GH-418; it previously lived in VISION.yaml).
-func loadFrontMatterAbstract(path string) (string, error) {
+// loadFrontMatter reads the pandoc YAML metadata block at the top of
+// 00-front-matter.md, the title of record (GH-427; it previously lived in
+// constitutions/argument.yaml) and the abstract's source of record (GH-418;
+// it previously lived in VISION.yaml).
+func loadFrontMatter(path string) (map[string]interface{}, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	s := string(data)
 	if !strings.HasPrefix(s, "---") {
-		return "", fmt.Errorf("%s: no YAML metadata block", path)
+		return nil, fmt.Errorf("%s: no YAML metadata block", path)
 	}
 	rest := s[3:]
 	end := strings.Index(rest, "\n---")
 	if end < 0 {
-		return "", fmt.Errorf("%s: unterminated YAML metadata block", path)
+		return nil, fmt.Errorf("%s: unterminated YAML metadata block", path)
 	}
 	var d map[string]interface{}
 	if err := yaml.Unmarshal([]byte(rest[:end]), &d); err != nil {
-		return "", fmt.Errorf("%s: %w", path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	abs := getStr(d, "abstract")
-	if abs == "" {
-		return "", fmt.Errorf("%s: abstract is empty; it is the source of record", path)
-	}
-	return abs, nil
+	return d, nil
 }
 
 func main() {
@@ -207,18 +203,18 @@ func main() {
 		`\hyphenation{auto-gen-ic}`,
 		`\begin{document}`)
 	visMeta := m(vis["meta"])
-	// The title of record is argument.yaml meta.paper, which carries the
-	// subtitle; VISION meta.artifact describes the artifact, not the paper, and
-	// 00-front-matter.md reads argument.yaml too. One source, no drift (GH-393).
-	argPath := filepath.Join(*docs, "constitutions", "argument.yaml")
-	arg, err := loadYAML(argPath)
+	// The title of record is 00-front-matter.md, which carries the subtitle;
+	// VISION meta.artifact describes the artifact, not the paper. One source,
+	// no drift (GH-393, retargeted from argument.yaml by GH-427).
+	fmPath := filepath.Join(*docs, "..", "00-front-matter.md")
+	front, err := loadFrontMatter(fmPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "genoutline:", err)
 		os.Exit(1)
 	}
-	title := getStr(m(arg["meta"]), "paper")
+	title := getStr(front, "title")
 	if title == "" {
-		fmt.Fprintf(os.Stderr, "genoutline: %s: meta.paper is empty; it is the title of record\n", argPath)
+		fmt.Fprintf(os.Stderr, "genoutline: %s: title is empty; it is the title of record\n", fmPath)
 		os.Exit(1)
 	}
 	w(`\title{Outline: ` + esc(title) + `}`)
@@ -226,9 +222,9 @@ func main() {
 	w(`\thanks{Outline generated from the section requirements documents (SRDs) of ieee-comst; regenerate with go run ../cmd/genoutline.}}`)
 	w(`\markboth{Working outline, ` + esc(startedDisplay(visMeta["started"])) + `}{Djukic: Outline}`)
 	w(`\maketitle`)
-	abstract, err := loadFrontMatterAbstract(filepath.Join(*docs, "..", "00-front-matter.md"))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "genoutline:", err)
+	abstract := getStr(front, "abstract")
+	if abstract == "" {
+		fmt.Fprintf(os.Stderr, "genoutline: %s: abstract is empty; it is the source of record\n", fmPath)
 		os.Exit(1)
 	}
 	w(`\begin{abstract}`)
