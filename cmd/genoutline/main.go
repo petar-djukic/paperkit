@@ -1,7 +1,8 @@
 // Command genoutline generates outline.tex from the SRDs (GH-94, ported from
 // gen_outline.py in GH-217).
 //
-// Reads <docs>/VISION.yaml (abstract), <docs>/constitutions/argument.yaml
+// Reads <docs>/../00-front-matter.md (the abstract's source of record),
+// <docs>/VISION.yaml (goals), <docs>/constitutions/argument.yaml
 // (the title of record) and <docs>/srd/*.yaml (units in
 // reading order) and emits a two-column IEEEtran outline document: per unit,
 // its goal sentence and the specific subgoals (each with an id G<n>.<m>
@@ -114,6 +115,34 @@ func startedDisplay(v interface{}) string {
 	return s
 }
 
+// loadFrontMatterAbstract reads the abstract from the pandoc YAML metadata
+// block at the top of 00-front-matter.md, the abstract's source of record
+// (GH-418; it previously lived in VISION.yaml).
+func loadFrontMatterAbstract(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	s := string(data)
+	if !strings.HasPrefix(s, "---") {
+		return "", fmt.Errorf("%s: no YAML metadata block", path)
+	}
+	rest := s[3:]
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return "", fmt.Errorf("%s: unterminated YAML metadata block", path)
+	}
+	var d map[string]interface{}
+	if err := yaml.Unmarshal([]byte(rest[:end]), &d); err != nil {
+		return "", fmt.Errorf("%s: %w", path, err)
+	}
+	abs := getStr(d, "abstract")
+	if abs == "" {
+		return "", fmt.Errorf("%s: abstract is empty; it is the source of record", path)
+	}
+	return abs, nil
+}
+
 func main() {
 	docs := flag.String("docs", "docs", "paper docs directory holding VISION.yaml and srd/")
 	flag.Parse()
@@ -197,8 +226,13 @@ func main() {
 	w(`\thanks{Outline generated from the section requirements documents (SRDs) of ieee-comst; regenerate with go run ../cmd/genoutline.}}`)
 	w(`\markboth{Working outline, ` + esc(startedDisplay(visMeta["started"])) + `}{Djukic: Outline}`)
 	w(`\maketitle`)
+	abstract, err := loadFrontMatterAbstract(filepath.Join(*docs, "..", "00-front-matter.md"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "genoutline:", err)
+		os.Exit(1)
+	}
 	w(`\begin{abstract}`)
-	w(esc(strings.Join(strings.Fields(getStr(vis, "abstract")), " ")))
+	w(esc(strings.Join(strings.Fields(abstract), " ")))
 	w(`\end{abstract}`)
 
 	for _, u := range units {
