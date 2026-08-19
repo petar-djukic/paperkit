@@ -1,7 +1,8 @@
 // Command genoutline generates outline.tex from the SRDs (GH-94, ported from
 // gen_outline.py in GH-217).
 //
-// Reads <docs>/VISION.yaml (title, abstract) and <docs>/srd/*.yaml (units in
+// Reads <docs>/VISION.yaml (abstract), <docs>/constitutions/argument.yaml
+// (the title of record) and <docs>/srd/*.yaml (units in
 // reading order) and emits a two-column IEEEtran outline document: per unit,
 // its goal sentence and the specific subgoals (each with an id G<n>.<m>
 // pointing at paper goal G<n>), and its content (the objective as a lead-in,
@@ -177,7 +178,20 @@ func main() {
 		`\hyphenation{auto-gen-ic}`,
 		`\begin{document}`)
 	visMeta := m(vis["meta"])
-	title := strings.Replace(getStr(visMeta, "artifact"), "COMST tutorial article: ", "", 1)
+	// The title of record is argument.yaml meta.paper, which carries the
+	// subtitle; VISION meta.artifact describes the artifact, not the paper, and
+	// 00-front-matter.md reads argument.yaml too. One source, no drift (GH-393).
+	argPath := filepath.Join(*docs, "constitutions", "argument.yaml")
+	arg, err := loadYAML(argPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "genoutline:", err)
+		os.Exit(1)
+	}
+	title := getStr(m(arg["meta"]), "paper")
+	if title == "" {
+		fmt.Fprintf(os.Stderr, "genoutline: %s: meta.paper is empty; it is the title of record\n", argPath)
+		os.Exit(1)
+	}
 	w(`\title{Outline: ` + esc(title) + `}`)
 	w(`\author{Petar Djukic%`)
 	w(`\thanks{Outline generated from the section requirements documents (SRDs) of ieee-comst; regenerate with go run ../cmd/genoutline.}}`)
