@@ -164,6 +164,14 @@ func main() {
 		`\usepackage{graphicx}`,
 		`\usepackage{float}`,
 		`\usepackage{array}`,
+		// The docs use U+202F (narrow no-break space) before numerals and after
+		// abbreviations -- "TM Forum", "Table 2.6", "Levels 3 and 4". Latin
+		// Modern has no glyph for it, so xelatex drops it silently and the PDF
+		// reads "Levels3". Map it to \, (an unbreakable thin space), which is
+		// what the character means. templates/ieee-preamble.tex carries the
+		// same mapping for the `mage build` path (GH-376).
+		`\usepackage{newunicodechar}`,
+		"\\newunicodechar{\u202f}{\\,}",
 		`\renewcommand{\tabularxcolumn}[1]{>{\raggedright\arraybackslash}p{#1}}`,
 		`\graphicspath{{../fig/}{fig/}}`,
 		`\hyphenation{auto-gen-ic}`,
