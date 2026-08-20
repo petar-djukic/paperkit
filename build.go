@@ -87,10 +87,48 @@ func PDF(root string, config Config) error {
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("latexmk: %w%s", err, logTail(root, config))
 	}
+	if err := CheckMissingChars(filepath.Join(buildDir, "main.log")); err != nil {
+		return err
+	}
 	if config.Output != "" && config.Output != "main.pdf" {
 		return os.Rename(filepath.Join(buildDir, "main.pdf"), filepath.Join(buildDir, config.Output))
 	}
 	return nil
+}
+
+// missingChar matches latexmk's report of a character absent from the fonts,
+// e.g. `Missing character: There is no ^^^^202f (U+202F) in font ...`.
+var missingChar = regexp.MustCompile(`Missing character: There is no .*?\(U\+([0-9A-Fa-f]{4,6})\)`)
+
+// CheckMissingChars fails when latexmk reported characters the fonts could not
+// render. latexmk exits zero on those warnings, so the glyph is dropped from
+// the PDF and every gate stays green — which is how 16 U+202F narrow no-break
+// spaces survived weeks of clean builds before GH-376 caught them by reading
+// the log. A missing glyph is silent corruption of the typeset output, so it
+// fails the build.
+func CheckMissingChars(logPath string) error {
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		return nil // no log to inspect; latexmk's own exit status stands
+	}
+	counts := map[string]int{}
+	for _, match := range missingChar.FindAllStringSubmatch(string(data), -1) {
+		counts["U+"+strings.ToUpper(match[1])]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(counts))
+	for name := range counts {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Printf("%s: %s appears %d time(s) but no font provides it; it is dropped from the PDF\n",
+			filepath.Base(logPath), name, counts[name])
+	}
+	return fmt.Errorf("%s: %d character(s) missing from the fonts — map them in the preamble",
+		filepath.Base(logPath), len(names))
 }
 
 var (

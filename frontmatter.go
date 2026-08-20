@@ -22,7 +22,7 @@ type TitlePage struct {
 	Title    string `yaml:"title"`
 	Subtitle string `yaml:"subtitle"`
 	Date     string `yaml:"date"`
-	Author   string `yaml:"author"`
+	Author   Author `yaml:"author"`
 
 	// Abstract is the frontmatter field when the page states one, otherwise
 	// the body below the abstract marker.
@@ -33,6 +33,28 @@ type TitlePage struct {
 	// carry front matter in its body — an IEEEkeywords block, for instance —
 	// which is emitted after the abstract.
 	Body string `yaml:"-"`
+}
+
+// Author is a title page's author field, which the papers write either as a
+// single scalar or as pandoc's list of names. Both decode; a list joins with
+// "and", which is what LaTeX expects between authors.
+type Author string
+
+func (a *Author) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.SequenceNode {
+		var names []string
+		if err := value.Decode(&names); err != nil {
+			return err
+		}
+		*a = Author(strings.Join(names, " and "))
+		return nil
+	}
+	var name string
+	if err := value.Decode(&name); err != nil {
+		return err
+	}
+	*a = Author(name)
+	return nil
 }
 
 var (
@@ -107,7 +129,7 @@ func (p TitlePage) titleBlock() string {
 // rendering the mailto link as a plain address rather than passing the
 // markdown through verbatim.
 func (p TitlePage) authorField() string {
-	author := strings.TrimSpace(p.Author)
+	author := strings.TrimSpace(string(p.Author))
 	if author == "" {
 		return ""
 	}

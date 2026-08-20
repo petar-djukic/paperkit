@@ -252,3 +252,38 @@ func buildFixture(t *testing.T) (string, Config) {
 	}
 	return root, config
 }
+
+func TestCheckMissingCharsPassesOnACleanLog(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "main.log", "This is XeTeX\nOutput written on main.pdf (22 pages).\n")
+
+	if err := CheckMissingChars(filepath.Join(root, "main.log")); err != nil {
+		t.Errorf("CheckMissingChars() = %v, want nil for a log with no warnings", err)
+	}
+}
+
+func TestCheckMissingCharsFailsOnDroppedGlyphs(t *testing.T) {
+	root := t.TempDir()
+	// latexmk exits zero on these, so only reading the log catches them.
+	writeFile(t, root, "main.log", strings.Join([]string{
+		`Missing character: There is no ^^^^202f (U+202F) in font [lmroman10]!`,
+		`Missing character: There is no ^^^^202f (U+202F) in font [lmroman10]!`,
+		`Missing character: There is no ^^^^2011 (U+2011) in font [lmroman10]!`,
+	}, "\n"))
+
+	err := CheckMissingChars(filepath.Join(root, "main.log"))
+	if err == nil {
+		t.Fatal("CheckMissingChars() = nil, want an error naming the dropped glyphs")
+	}
+	if !strings.Contains(err.Error(), "2 character(s) missing") {
+		t.Errorf("error = %q, want it to count the two distinct code points", err)
+	}
+}
+
+func TestCheckMissingCharsIgnoresAnAbsentLog(t *testing.T) {
+	// A build that never got as far as writing a log leaves latexmk's own exit
+	// status to speak; inventing an error here would mask it.
+	if err := CheckMissingChars(filepath.Join(t.TempDir(), "main.log")); err != nil {
+		t.Errorf("CheckMissingChars() = %v, want nil when there is no log", err)
+	}
+}
