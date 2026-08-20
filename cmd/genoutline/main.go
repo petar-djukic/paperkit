@@ -219,7 +219,7 @@ func main() {
 	}
 	w(`\title{Outline: ` + esc(title) + `}`)
 	w(`\author{Petar Djukic%`)
-	w(`\thanks{Outline generated from the section requirements documents (SRDs) of ieee-comst; regenerate with go run ../cmd/genoutline.}}`)
+	w(`\thanks{Outline generated from the section requirements documents (SRDs) of autonomous-network-tutorial; regenerate with go run ../cmd/genoutline.}}`)
 	w(`\markboth{Working outline, ` + esc(startedDisplay(visMeta["started"])) + `}{Djukic: Outline}`)
 	w(`\maketitle`)
 	abstract := getStr(front, "abstract")
