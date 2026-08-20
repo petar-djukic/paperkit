@@ -2,7 +2,7 @@
 // CSL-YAML corpus.
 //
 // references.yaml (managed by the update-references literature pipeline) is
-// the source of truth. Each per-manuscript directory (e.g. ieee-comst/) keeps
+// the source of truth. Each per-manuscript directory (e.g. autonomous-network-tutorial/) keeps
 // a tracked, regenerable references.bib so the LaTeX build can use
 // bibtex/IEEEtran.bst and reviewers can diff the corpus.
 //
