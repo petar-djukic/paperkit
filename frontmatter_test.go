@@ -291,3 +291,47 @@ func writeTemp(t *testing.T, name, content string) string {
 	}
 	return path
 }
+
+func TestReadTitlePageAcceptsAnAuthorList(t *testing.T) {
+	// pandoc's own convention writes author as a sequence; the papers differ,
+	// so both forms have to reach the same \author field.
+	root := t.TempDir()
+	writeFile(t, root, "00-front-matter.md", strings.Join([]string{
+		"---",
+		"title: A Tutorial",
+		"author:",
+		"  - Ada Lovelace",
+		"  - Alan Turing",
+		"abstract: >",
+		"  One paragraph.",
+		"---",
+		"",
+	}, "\n"))
+
+	page, err := ReadTitlePage(filepath.Join(root, "00-front-matter.md"))
+	if err != nil {
+		t.Fatalf("ReadTitlePage() error: %v", err)
+	}
+	if got, want := string(page.Author), "Ada Lovelace and Alan Turing"; got != want {
+		t.Errorf("Author = %q, want %q", got, want)
+	}
+}
+
+func TestReadTitlePageAcceptsAScalarAuthor(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "00-title-page.md", strings.Join([]string{
+		"---",
+		"title: A Paper",
+		"author: Ada Lovelace",
+		"---",
+		"",
+	}, "\n"))
+
+	page, err := ReadTitlePage(filepath.Join(root, "00-title-page.md"))
+	if err != nil {
+		t.Fatalf("ReadTitlePage() error: %v", err)
+	}
+	if got, want := string(page.Author), "Ada Lovelace"; got != want {
+		t.Errorf("Author = %q, want %q", got, want)
+	}
+}
