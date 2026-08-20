@@ -2,9 +2,9 @@
 // CSL-YAML corpus.
 //
 // references.yaml (managed by the update-references literature pipeline) is
-// the source of truth. Each per-manuscript directory (e.g. ieee-proceedings/,
-// ieee-comst/) keeps a tracked, regenerable references.bib so the LaTeX build
-// can use bibtex/IEEEtran.bst and reviewers can diff the corpus.
+// the source of truth. Each per-manuscript directory (e.g. ieee-comst/) keeps
+// a tracked, regenerable references.bib so the LaTeX build can use
+// bibtex/IEEEtran.bst and reviewers can diff the corpus.
 //
 // The corpus stores dates as `issued: {year: 2024}` (a shorthand pandoc
 // accepts when reading a CSL-YAML bibliography, but not via its csljson
