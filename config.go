@@ -2,6 +2,28 @@
 // source of truth, LaTeX under tex/ is a hand-editable intermediate, and
 // latexmk produces the PDF. Every paper directory drives the same targets
 // through a thin magefile plus a paper.yaml.
+//
+// # Two forward engines
+//
+// A paper names its engine in paper.yaml. The default, pandoc, converts each
+// chapter through pandoc and the Lua filters the paper configures. The other,
+// md-to-tex, converts through github.com/petar-djukic/md-to-tex: no filters,
+// no pandoc process, and a container document in place of pandoc's harvested
+// skeleton. The backport direction and the PDF compile are the same either
+// way, because the library does neither.
+//
+// autonomous-network-tutorial converts through the library (GH-468). The
+// other four papers stay on pandoc, and the reason is their markdown rather
+// than the engine: the library requires a caption where pandoc lets an
+// uncaptioned table through, and captions are written once, in the markdown,
+// so a table without one has nowhere to keep it. Each paper moves when its
+// own migration issue is done — GH-473, GH-474, GH-475, which carry the
+// per-chapter counts.
+//
+// A paper on the library path also loads natbib in its own preamble. The
+// container names the preamble and never generates its contents, so nothing
+// else brings it in, and without it the IEEE bibliography style prints each
+// entry's author-year label where its number belongs.
 package paperkit
 
 import (
