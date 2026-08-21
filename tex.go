@@ -38,30 +38,79 @@ func GenerateTex(root string, config Config) ([]ChapterResult, error) {
 		return nil, err
 	}
 
-	results := make([]ChapterResult, 0, len(config.Chapters))
-	needsAttention := 0
-	for _, chapter := range config.Chapters {
-		generated, err := generateChapter(root, config, chapter)
-		if err != nil {
-			return results, fmt.Errorf("%s: %w", chapter, err)
-		}
-		disposition, err := reconcile(root, config, chapter, generated)
-		if err != nil {
-			return results, fmt.Errorf("%s: %w", chapter, err)
-		}
-		results = append(results, ChapterResult{Chapter: chapter, Disposition: disposition})
-		if disposition == Conflicted || disposition == Orphaned {
-			needsAttention++
-		}
+	if config.Engine == EngineLibrary {
+		return generateWithLibrary(root, config)
 	}
 
+	results, err := reconcileAll(root, config, config.Chapters, func(chapter string) ([]byte, error) {
+		return generateChapter(root, config, chapter)
+	})
+	if err != nil {
+		return results, err
+	}
 	if err := generateSkeleton(root, config); err != nil {
 		return results, err
 	}
-	if needsAttention > 0 {
-		return results, fmt.Errorf("%d of %d chapters: %w", needsAttention, len(config.Chapters), ErrConflicts)
+	return results, attention(results)
+}
+
+// generateWithLibrary is the md-to-tex path: every source converts first, the
+// labels are checked across the whole roster, and only then does anything
+// reach the author's tex directory. The container replaces the skeleton, so
+// pandoc is not called at all.
+func generateWithLibrary(root string, config Config) ([]ChapterResult, error) {
+	fragments, converted, err := convertRoster(root, config)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkCollisions(converted); err != nil {
+		return nil, err
+	}
+
+	results, err := reconcileAll(root, config, config.roster(), func(source string) ([]byte, error) {
+		return fragments[source], nil
+	})
+	if err != nil {
+		return results, err
+	}
+	if err := generateContainer(root, config); err != nil {
+		return results, err
+	}
+	return results, attention(results)
+}
+
+// reconcileAll renders each source and merges it into the author's copy,
+// reporting what happened to every one of them. Rendering is the caller's,
+// because that is the only part the two engines do differently.
+func reconcileAll(root string, config Config, sources []string, render func(string) ([]byte, error)) ([]ChapterResult, error) {
+	results := make([]ChapterResult, 0, len(sources))
+	for _, source := range sources {
+		generated, err := render(source)
+		if err != nil {
+			return results, fmt.Errorf("%s: %w", source, err)
+		}
+		disposition, err := reconcile(root, config, source, generated)
+		if err != nil {
+			return results, fmt.Errorf("%s: %w", source, err)
+		}
+		results = append(results, ChapterResult{Chapter: source, Disposition: disposition})
 	}
 	return results, nil
+}
+
+// attention reports the chapters a person has to look at, so a build that
+// merged cleanly is silent and one that did not fails with a count.
+func attention(results []ChapterResult) error {
+	needsAttention := 0
+	for _, result := range results {
+		if result.Disposition == Conflicted || result.Disposition == Orphaned {
+			needsAttention++
+		}
+	}
+	if needsAttention > 0 {
+		return fmt.Errorf("%d of %d chapters: %w", needsAttention, len(results), ErrConflicts)
+	}
+	return nil
 }
 
 // generateChapter renders one chapter to LaTeX and returns the bytes. It

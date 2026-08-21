@@ -2,6 +2,28 @@
 // source of truth, LaTeX under tex/ is a hand-editable intermediate, and
 // latexmk produces the PDF. Every paper directory drives the same targets
 // through a thin magefile plus a paper.yaml.
+//
+// # Two forward engines
+//
+// A paper names its engine in paper.yaml. The default, pandoc, converts each
+// chapter through pandoc and the Lua filters the paper configures. The other,
+// md-to-tex, converts through github.com/petar-djukic/md-to-tex: no filters,
+// no pandoc process, and a container document in place of pandoc's harvested
+// skeleton. The backport direction and the PDF compile are the same either
+// way, because the library does neither.
+//
+// autonomous-network-tutorial converts through the library (GH-468). The
+// other four papers stay on pandoc, and the reason is their markdown rather
+// than the engine: the library requires a caption where pandoc lets an
+// uncaptioned table through, and captions are written once, in the markdown,
+// so a table without one has nowhere to keep it. Each paper moves when its
+// own migration issue is done — GH-473, GH-474, GH-475, which carry the
+// per-chapter counts.
+//
+// A paper on the library path also loads natbib in its own preamble. The
+// container names the preamble and never generates its contents, so nothing
+// else brings it in, and without it the IEEE bibliography style prints each
+// entry's author-year label where its number belongs.
 package paperkit
 
 import (
@@ -74,7 +96,26 @@ type Config struct {
 	// IEEEtran paper with any table fails to compile until a filter rewrites
 	// those tables into table* floats.
 	Filters []string `yaml:"filters"`
+
+	// Engine names what converts markdown to LaTeX on the forward path.
+	//
+	// The papers do not all convert the same way yet. md-to-tex requires
+	// captions where pandoc invents them — a table states its caption in a
+	// Table: line, a figure in its alt text — so a paper moves over once its
+	// markdown carries them. Until then it stays on pandoc with the filters,
+	// and both paths are maintained rather than one being a migration
+	// staging area.
+	Engine string `yaml:"engine"`
 }
+
+// The engines a paper may name.
+const (
+	// EnginePandoc converts through pandoc and the configured Lua filters.
+	EnginePandoc = "pandoc"
+	// EngineLibrary converts through md-to-tex, which needs no filters and no
+	// pandoc process on the forward path.
+	EngineLibrary = "md-to-tex"
+)
 
 // LoadConfig reads paper.yaml from root and applies defaults. A config naming
 // a chapter that is not on disk is an error: a paper that silently drops a
@@ -125,9 +166,15 @@ func (c *Config) applyDefaults() {
 	if c.RefsTool == "" {
 		c.RefsTool = filepath.Join("..", "cmd", "refs2bib")
 	}
+	if c.Engine == "" {
+		c.Engine = EnginePandoc
+	}
 }
 
 func (c Config) validate(root string) error {
+	if c.Engine != EnginePandoc && c.Engine != EngineLibrary {
+		return fmt.Errorf("engine %q is neither %s nor %s", c.Engine, EnginePandoc, EngineLibrary)
+	}
 	if len(c.Chapters) == 0 {
 		return fmt.Errorf("paper config lists no chapters")
 	}
@@ -161,6 +208,25 @@ func (c Config) validate(root string) error {
 		}
 	}
 	return nil
+}
+
+// roster is every markdown source that becomes a fragment the container
+// inputs, in the order it is typeset: the title page, the chapters, then the
+// acknowledgment. The optional two are absent from papers that configure
+// neither, which is why this is not simply Chapters.
+//
+// The pandoc path has no equivalent: it splices the title block into main.tex
+// rather than giving it a fragment of its own.
+func (c Config) roster() []string {
+	roster := make([]string, 0, len(c.Chapters)+2)
+	if c.TitlePage != "" {
+		roster = append(roster, c.TitlePage)
+	}
+	roster = append(roster, c.Chapters...)
+	if c.Acknowledgments != "" {
+		roster = append(roster, c.Acknowledgments)
+	}
+	return roster
 }
 
 // filterArgs renders the configured filters as pandoc arguments. The paths stay
