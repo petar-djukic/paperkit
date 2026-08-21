@@ -24,6 +24,9 @@ func TestLoadConfigAppliesDefaults(t *testing.T) {
 		{"BuildDir", config.BuildDir, "build"},
 		{"Output", config.Output, "paper.pdf"},
 		{"Preamble", config.Preamble, filepath.Join("templates", "ieee-preamble.tex")},
+		// A paper that names no engine keeps converting through pandoc, which
+		// is what lets papers move over one at a time.
+		{"Engine", config.Engine, EnginePandoc},
 	} {
 		if field.got != field.want {
 			t.Errorf("%s = %q, want %q", field.name, field.got, field.want)
@@ -90,6 +93,51 @@ func TestLoadConfigRejectsEmptyAndDuplicateChapters(t *testing.T) {
 	duplicate := paperFixture(t, "chapters:\n  - 01-intro.md\n  - 01-intro.md\n", "01-intro.md")
 	if _, err := LoadConfig(duplicate); err == nil || !strings.Contains(err.Error(), "listed twice") {
 		t.Errorf("duplicate chapter error = %v", err)
+	}
+}
+
+func TestLoadConfigRejectsUnknownEngine(t *testing.T) {
+	root := paperFixture(t, "engine: latexml\nchapters:\n  - 01-intro.md\n", "01-intro.md")
+
+	_, err := LoadConfig(root)
+	if err == nil {
+		t.Fatal("LoadConfig() accepted an engine nothing implements")
+	}
+	if !strings.Contains(err.Error(), "latexml") {
+		t.Errorf("error does not name the engine: %v", err)
+	}
+}
+
+func TestConfigRosterLeadsWithTitlePageAndEndsWithAcknowledgments(t *testing.T) {
+	root := paperFixture(t,
+		"title_page: 00-front.md\nacknowledgments: thanks.md\nchapters:\n  - 01-intro.md\n",
+		"01-intro.md", "00-front.md", "thanks.md")
+
+	config, err := LoadConfig(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roster := config.roster()
+	want := []string{"00-front.md", "01-intro.md", "thanks.md"}
+	if len(roster) != len(want) {
+		t.Fatalf("roster() = %v, want %v", roster, want)
+	}
+	for i, source := range want {
+		if roster[i] != source {
+			t.Errorf("roster()[%d] = %q, want %q", i, roster[i], source)
+		}
+	}
+}
+
+func TestConfigRosterOmitsUnconfiguredOptionalSources(t *testing.T) {
+	root := paperFixture(t, "chapters:\n  - 01-intro.md\n", "01-intro.md")
+
+	config, err := LoadConfig(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if roster := config.roster(); len(roster) != 1 || roster[0] != "01-intro.md" {
+		t.Errorf("roster() = %v, want just the chapter", roster)
 	}
 }
 

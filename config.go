@@ -74,7 +74,26 @@ type Config struct {
 	// IEEEtran paper with any table fails to compile until a filter rewrites
 	// those tables into table* floats.
 	Filters []string `yaml:"filters"`
+
+	// Engine names what converts markdown to LaTeX on the forward path.
+	//
+	// The papers do not all convert the same way yet. md-to-tex requires
+	// captions where pandoc invents them — a table states its caption in a
+	// Table: line, a figure in its alt text — so a paper moves over once its
+	// markdown carries them. Until then it stays on pandoc with the filters,
+	// and both paths are maintained rather than one being a migration
+	// staging area.
+	Engine string `yaml:"engine"`
 }
+
+// The engines a paper may name.
+const (
+	// EnginePandoc converts through pandoc and the configured Lua filters.
+	EnginePandoc = "pandoc"
+	// EngineLibrary converts through md-to-tex, which needs no filters and no
+	// pandoc process on the forward path.
+	EngineLibrary = "md-to-tex"
+)
 
 // LoadConfig reads paper.yaml from root and applies defaults. A config naming
 // a chapter that is not on disk is an error: a paper that silently drops a
@@ -125,9 +144,15 @@ func (c *Config) applyDefaults() {
 	if c.RefsTool == "" {
 		c.RefsTool = filepath.Join("..", "cmd", "refs2bib")
 	}
+	if c.Engine == "" {
+		c.Engine = EnginePandoc
+	}
 }
 
 func (c Config) validate(root string) error {
+	if c.Engine != EnginePandoc && c.Engine != EngineLibrary {
+		return fmt.Errorf("engine %q is neither %s nor %s", c.Engine, EnginePandoc, EngineLibrary)
+	}
 	if len(c.Chapters) == 0 {
 		return fmt.Errorf("paper config lists no chapters")
 	}
@@ -161,6 +186,25 @@ func (c Config) validate(root string) error {
 		}
 	}
 	return nil
+}
+
+// roster is every markdown source that becomes a fragment the container
+// inputs, in the order it is typeset: the title page, the chapters, then the
+// acknowledgment. The optional two are absent from papers that configure
+// neither, which is why this is not simply Chapters.
+//
+// The pandoc path has no equivalent: it splices the title block into main.tex
+// rather than giving it a fragment of its own.
+func (c Config) roster() []string {
+	roster := make([]string, 0, len(c.Chapters)+2)
+	if c.TitlePage != "" {
+		roster = append(roster, c.TitlePage)
+	}
+	roster = append(roster, c.Chapters...)
+	if c.Acknowledgments != "" {
+		roster = append(roster, c.Acknowledgments)
+	}
+	return roster
 }
 
 // filterArgs renders the configured filters as pandoc arguments. The paths stay
