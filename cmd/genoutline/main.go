@@ -139,8 +139,166 @@ func loadFrontMatter(path string) (map[string]interface{}, error) {
 	return d, nil
 }
 
+// emitMarkdown renders the outline as a markdown chapter: plain text a
+// human reads in any editor (or Obsidian), and a valid md-to-tex source the
+// paper's magefile compiles through the same pipeline as the chapters. The
+// title and abstract stay in 00-front-matter.md — the outline is a chapter,
+// so the paper's own front matter renders the title page. Citations are
+// pandoc-style [@id] and resolve against the paper's bibliography; planned
+// tables and figures render as italic notes, and a table with drafted rows
+// renders as a pipe table with the caption line md-to-tex requires.
+func emitMarkdown(vis map[string]interface{}, units []string, srds map[string]map[string]interface{}) {
+	var out []string
+	w := func(lines ...string) { out = append(out, lines...) }
+
+	w("<!-- Generated from docs/srd/*.yaml by cmd/genoutline -format md;")
+	w("     regenerate with `mage outline`. Edit the SRDs, not this file. -->")
+
+	for _, u := range units {
+		d := srds[u]
+		meta := m(d["meta"])
+		title := oneLine(meta["title"])
+		depth := strings.Count(u, ".")
+		heading := "#"
+		kind := "section"
+		if depth > 0 {
+			heading = "##"
+			kind = "subsection"
+		}
+		w("", heading+" "+title)
+
+		// In the introduction, state the paper goals first.
+		if u == "S1" {
+			goals := list(vis["goals"])
+			w("", fmt.Sprintf("The paper has %d goals.", len(goals)), "")
+			for _, gg := range goals {
+				gm := m(gg)
+				w("- **" + getStr(gm, "id") + "** " + oneLine(gm["goal"]))
+			}
+		}
+
+		if sg := oneLine(d["section_goal"]); d["section_goal"] != nil && sg != "" {
+			w("", "The goal of this "+kind+" is to "+sg+".")
+		}
+		if goals := list(d["goals"]); len(goals) > 0 {
+			w("")
+			for _, g := range goals {
+				gm := m(g)
+				pre := ""
+				if id := getStr(gm, "id"); id != "" {
+					pre = "**" + id + "** "
+				}
+				w("- " + pre + oneLine(gm["goal"]))
+			}
+		}
+		if d["objective"] != nil {
+			if obj := oneLine(d["objective"]); obj != "" {
+				lead := strings.ToLower(obj[:1]) + obj[1:]
+				w("", "The content of this "+kind+" "+lead)
+			}
+		}
+		var arts []string
+		if says := list(d["content"]); len(says) > 0 {
+			w("")
+			for _, t := range says {
+				tm := m(t)
+				if s, ok := tm["say"].(string); ok && s != "" && !strings.Contains(s, "GH-") {
+					w("- " + oneLine(s))
+				}
+				if a, ok := tm["artifact"]; ok && a != nil && str(a) != "" {
+					arts = append(arts, oneLine(a))
+				}
+			}
+		}
+
+		// Closing paragraph: artifacts, contribution edges, references.
+		var p2 []string
+		if len(arts) > 0 {
+			p2 = append(p2, "Planned artifacts: "+strings.Join(arts, "; ")+".")
+		}
+		links := m(d["links"])
+		disp := func(us []interface{}) string {
+			var parts []string
+			for _, x := range us {
+				parts = append(parts, str(x))
+			}
+			return strings.Join(parts, ", ")
+		}
+		var edges []string
+		if sup := list(links["supports"]); len(sup) > 0 {
+			edges = append(edges, "feeds "+disp(sup))
+		}
+		if req := list(links["requires"]); len(req) > 0 {
+			edges = append(edges, "builds on "+disp(req))
+		}
+		if len(edges) > 0 {
+			p2 = append(p2, "This unit "+strings.Join(edges, "; ")+".")
+		}
+		var cites []string
+		for _, c := range list(d["citations"]) {
+			cm, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if id := getStr(cm, "id"); id != "" {
+				cites = append(cites, "[@"+id+"]")
+			}
+		}
+		if len(cites) > 0 {
+			p2 = append(p2, "References: "+strings.Join(cites, ", ")+".")
+		}
+		if len(p2) > 0 {
+			w("", strings.Join(p2, " "))
+		}
+
+		for index, tb := range list(d["tables"]) {
+			tbm := m(tb)
+			cols := list(tbm["columns"])
+			rows := list(tbm["rows"])
+			if len(cols) > 0 && len(rows) > 0 {
+				var hdr, sep []string
+				for _, c := range cols {
+					hdr = append(hdr, str(c))
+					sep = append(sep, "---")
+				}
+				w("", "| "+strings.Join(hdr, " | ")+" |")
+				w("|" + strings.Join(sep, "|") + "|")
+				for _, row := range rows {
+					var cells []string
+					for _, x := range list(row) {
+						cells = append(cells, str(x))
+					}
+					w("| " + strings.Join(cells, " | ") + " |")
+				}
+				w("", fmt.Sprintf("Table: %s {#tab:outline-%s-%d}", oneLine(tbm["shows"]), strings.ReplaceAll(u[1:], ".", "-"), index+1))
+			} else {
+				note := "*Table planned: " + oneLine(tbm["shows"])
+				if len(cols) > 0 {
+					var names []string
+					for _, c := range cols {
+						names = append(names, str(c))
+					}
+					note += " (columns: " + strings.Join(names, "; ") + ")"
+				}
+				w("", note+".*")
+			}
+		}
+		for _, fg := range list(d["figures"]) {
+			fgm := m(fg)
+			note := "*Figure planned: " + oneLine(fgm["shows"])
+			if getStr(fgm, "status") == "ready" {
+				note = "*Figure ready (" + getStr(fgm, "file") + "): " + oneLine(fgm["shows"])
+			}
+			w("", note+".*")
+		}
+	}
+
+	os.Stdout.WriteString(strings.Join(out, "\n") + "\n")
+}
+
 func main() {
 	docs := flag.String("docs", "docs", "paper docs directory holding VISION.yaml and srd/")
+	format := flag.String("format", "tex", "output format: tex (a standalone IEEEtran document) or md (a markdown chapter for the md-to-tex pipeline)")
 	flag.Parse()
 
 	vis, err := loadYAML(filepath.Join(*docs, "VISION.yaml"))
@@ -178,6 +336,11 @@ func main() {
 		}
 		return bi < bj
 	})
+
+	if *format == "md" {
+		emitMarkdown(vis, units, srds)
+		return
+	}
 
 	var out []string
 	w := func(lines ...string) { out = append(out, lines...) }

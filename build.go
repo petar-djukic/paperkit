@@ -77,9 +77,14 @@ func PDF(root string, config Config) error {
 	// -outdir a parent-relative \graphicspath stops resolving — the aux files
 	// have to land outside tex/, which holds committed sources, so the search
 	// path moves instead of the output.
+	// The container is named explicitly relative to the tex directory:
+	// TEXINPUTS below searches the whole paper tree recursively, and a bare
+	// "main.tex" can resolve to another tex directory's container when a
+	// paper builds more than one (the outline compiles as a one-chapter
+	// paper with its own TexDir).
 	command := exec.Command("latexmk",
 		"-xelatex", "-interaction=nonstopmode", "-halt-on-error",
-		"-outdir="+outDir, "main.tex")
+		"-outdir="+outDir, "./main.tex")
 	command.Dir = filepath.Join(root, config.TexDir)
 	command.Env = append(os.Environ(), "TEXINPUTS="+absoluteRoot+"//:")
 	command.Stdout = os.Stdout
