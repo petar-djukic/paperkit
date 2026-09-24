@@ -219,7 +219,11 @@ func main() {
 	}
 	w(`\title{Outline: ` + esc(title) + `}`)
 	w(`\author{Petar Djukic%`)
-	w(`\thanks{Outline generated from the section requirements documents (SRDs) of autonomous-network-tutorial; regenerate with go run ../cmd/genoutline.}}`)
+	paperName := "the paper"
+	if absDocs, err := filepath.Abs(*docs); err == nil {
+		paperName = filepath.Base(filepath.Dir(absDocs))
+	}
+	w(`\thanks{Outline generated from the section requirements documents (SRDs) of ` + esc(paperName) + `; regenerate with go run ../cmd/genoutline.}}`)
 	w(`\markboth{Working outline, ` + esc(startedDisplay(visMeta["started"])) + `}{Djukic: Outline}`)
 	w(`\maketitle`)
 	abstract := getStr(front, "abstract")
