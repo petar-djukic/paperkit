@@ -13,13 +13,13 @@ import (
 // outside its own root, a title page, and whatever chapters the case needs.
 func libraryFixture(t *testing.T, chapters ...string) string {
 	t.Helper()
-	config := "engine: md-to-tex\nbibliography: references.yaml\ntitle_page: 00-front-matter.md\nchapters:\n"
+	config := "engine: md-to-tex\nbibliography: references.yaml\ntitle_page: 00-title-page.md\nchapters:\n"
 	for _, chapter := range chapters {
 		config += "  - " + chapter + "\n"
 	}
 	root := paperFixture(t, config)
 	writeFile(t, root, "references.yaml", "- id: lee-2026\n  title: A Cited Work\n")
-	writeFile(t, root, "00-front-matter.md",
+	writeFile(t, root, "00-title-page.md",
 		"---\ntitle: A Paper\nauthor:\n  - Petar Djukic\nabstract: The abstract.\n---\n")
 	return root
 }
@@ -64,9 +64,9 @@ func TestGenerateTexLibraryEngineConvertsWithoutPandoc(t *testing.T) {
 
 	// The title page becomes a fragment of its own rather than being spliced
 	// into the container, which is what makes its name match its markdown.
-	front := readFile(t, root, "tex/00-front-matter.tex")
+	front := readFile(t, root, "tex/00-title-page.tex")
 	if !strings.Contains(front, `\title{A Paper}`) || !strings.Contains(front, `\begin{abstract}`) {
-		t.Errorf("00-front-matter.tex carries no title block or abstract:\n%s", front)
+		t.Errorf("00-title-page.tex carries no title block or abstract:\n%s", front)
 	}
 }
 
@@ -98,7 +98,7 @@ func TestGenerateTexLibraryContainerInputsRosterInOrder(t *testing.T) {
 	}
 
 	// Config order is authoritative, and the title page leads.
-	order := []string{`\input{00-front-matter}`, `\input{02-second}`, `\input{01-first}`}
+	order := []string{`\input{00-title-page}`, `\input{02-second}`, `\input{01-first}`}
 	position := 0
 	for _, input := range order {
 		index := strings.Index(main[position:], input)
