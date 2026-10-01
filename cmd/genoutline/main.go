@@ -1,7 +1,7 @@
 // Command genoutline generates outline.tex from the SRDs (GH-94, ported from
 // gen_outline.py in GH-217).
 //
-// Reads <docs>/../00-front-matter.md (the title of record and the abstract's
+// Reads <docs>/../00-title-page.md (the title of record and the abstract's
 // source of record), <docs>/VISION.yaml (goals) and <docs>/srd/*.yaml (units in
 // reading order) and emits a two-column IEEEtran outline document: per unit,
 // its goal sentence and the specific subgoals (each with an id G<n>.<m>
@@ -115,7 +115,7 @@ func startedDisplay(v interface{}) string {
 }
 
 // loadFrontMatter reads the pandoc YAML metadata block at the top of
-// 00-front-matter.md, the title of record (GH-427; it previously lived in
+// 00-title-page.md, the title of record (GH-427; it previously lived in
 // constitutions/argument.yaml) and the abstract's source of record (GH-418;
 // it previously lived in VISION.yaml).
 func loadFrontMatter(path string) (map[string]interface{}, error) {
@@ -142,7 +142,7 @@ func loadFrontMatter(path string) (map[string]interface{}, error) {
 // emitMarkdown renders the outline as a markdown chapter: plain text a
 // human reads in any editor (or Obsidian), and a valid md-to-tex source the
 // paper's magefile compiles through the same pipeline as the chapters. The
-// title and abstract stay in 00-front-matter.md — the outline is a chapter,
+// title and abstract stay in 00-title-page.md — the outline is a chapter,
 // so the paper's own front matter renders the title page. Citations are
 // pandoc-style [@id] and resolve against the paper's bibliography; planned
 // tables and figures render as italic notes, and a table with drafted rows
@@ -366,10 +366,10 @@ func main() {
 		`\hyphenation{auto-gen-ic}`,
 		`\begin{document}`)
 	visMeta := m(vis["meta"])
-	// The title of record is 00-front-matter.md, which carries the subtitle;
+	// The title of record is 00-title-page.md, which carries the subtitle;
 	// VISION meta.artifact describes the artifact, not the paper. One source,
 	// no drift (GH-393, retargeted from argument.yaml by GH-427).
-	fmPath := filepath.Join(*docs, "..", "00-front-matter.md")
+	fmPath := filepath.Join(*docs, "..", "00-title-page.md")
 	front, err := loadFrontMatter(fmPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "genoutline:", err)

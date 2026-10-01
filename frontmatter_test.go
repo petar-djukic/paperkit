@@ -296,7 +296,7 @@ func TestReadTitlePageAcceptsAnAuthorList(t *testing.T) {
 	// pandoc's own convention writes author as a sequence; the papers differ,
 	// so both forms have to reach the same \author field.
 	root := t.TempDir()
-	writeFile(t, root, "00-front-matter.md", strings.Join([]string{
+	writeFile(t, root, "00-title-page.md", strings.Join([]string{
 		"---",
 		"title: A Tutorial",
 		"author:",
@@ -308,7 +308,7 @@ func TestReadTitlePageAcceptsAnAuthorList(t *testing.T) {
 		"",
 	}, "\n"))
 
-	page, err := ReadTitlePage(filepath.Join(root, "00-front-matter.md"))
+	page, err := ReadTitlePage(filepath.Join(root, "00-title-page.md"))
 	if err != nil {
 		t.Fatalf("ReadTitlePage() error: %v", err)
 	}
