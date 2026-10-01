@@ -570,9 +570,7 @@ func main() {
 			w(`\begin{figure}[H]`)
 			w(`\centering`)
 			if getStr(fgm, "status") == "ready" {
-				file := getStr(fgm, "file")
-				parts := strings.Split(file, "/")
-				w(`\includegraphics[width=\columnwidth]{` + parts[len(parts)-1] + `}`)
+				w(`\includegraphics[width=\columnwidth]{` + figureArtifact(getStr(fgm, "file")) + `}`)
 			} else {
 				w(`\fbox{\parbox[c][3\baselineskip][c]{0.85\columnwidth}{\centering\textit{[figure planned]}}}`)
 			}
@@ -586,4 +584,18 @@ func main() {
 	w(`\bibliography{references}`)
 	w(`\end{document}`)
 	os.Stdout.WriteString(strings.Join(out, "\n") + "\n")
+}
+
+// figureArtifact maps an SRD figure declaration to the file graphicx should
+// include. SRDs declare figures either as the compiled artifact
+// (fig/<stem>.pdf) or as the d2 source (d2/<stem>.d2); the source form is the
+// more durable declaration, but LaTeX can only bound the PDF the figures
+// target compiles beside it.
+func figureArtifact(declared string) string {
+	parts := strings.Split(declared, "/")
+	name := parts[len(parts)-1]
+	if strings.HasSuffix(name, ".d2") {
+		return strings.TrimSuffix(name, ".d2") + ".pdf"
+	}
+	return name
 }
