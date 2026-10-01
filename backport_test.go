@@ -9,7 +9,6 @@ import (
 )
 
 func TestBackportSkipsChapterWhoseTexMatchesBaseline(t *testing.T) {
-	requirePandoc(t)
 	root, config := backportFixture(t, "# Chapter\n\nParagraph one.\n")
 
 	results, err := Backport(root, config)
@@ -25,13 +24,13 @@ func TestBackportSkipsChapterWhoseTexMatchesBaseline(t *testing.T) {
 }
 
 func TestBackportIgnoresTypesettingOnlyEdits(t *testing.T) {
-	requirePandoc(t)
-	root, config := backportFixture(t, "# Chapter\n\nParagraph one.\n\n![A figure](fig/x.png)\n")
+	root, config := backportFixture(t, "# Chapter\n\nParagraph one.\n\n![A figure](fig/x.png){#fig:x}\n")
 
 	// Change only the float placement specifier, which markdown cannot
-	// represent, so converting back yields identical prose.
+	// represent, so converting back yields identical prose. The generator
+	// emits [!t], so the edit moves the float to the bottom.
 	tex := readFile(t, root, "tex/01-chapter.tex")
-	edited := strings.Replace(tex, `\begin{figure}`, `\begin{figure}[!t]`, 1)
+	edited := strings.Replace(tex, `\begin{figure}[!t]`, `\begin{figure}[!b]`, 1)
 	if edited == tex {
 		t.Skip("generated tex has no figure float to adjust")
 	}
@@ -50,7 +49,6 @@ func TestBackportIgnoresTypesettingOnlyEdits(t *testing.T) {
 }
 
 func TestBackportProposesProseChangeAndAppliesOnlyWhenAsked(t *testing.T) {
-	requirePandoc(t)
 	source := "# Chapter\n\nParagraph one.\n\nParagraph two.\n\nParagraph three.\n"
 	root, config := backportFixture(t, source)
 
@@ -86,7 +84,6 @@ func TestBackportProposesProseChangeAndAppliesOnlyWhenAsked(t *testing.T) {
 }
 
 func TestBackportReportsUnbasedChapter(t *testing.T) {
-	requirePandoc(t)
 	root, config := backportFixture(t, "# Chapter\n\nParagraph one.\n")
 	if err := os.Remove(baselinePath(root, config, "01-chapter.md")); err != nil {
 		t.Fatal(err)
@@ -102,7 +99,6 @@ func TestBackportReportsUnbasedChapter(t *testing.T) {
 }
 
 func TestBackportContestsWhenMarkdownAlsoMoved(t *testing.T) {
-	requirePandoc(t)
 	source := "# Chapter\n\nParagraph one.\n\nParagraph two.\n\nParagraph three.\n"
 	root, config := backportFixture(t, source)
 
@@ -184,7 +180,7 @@ func TestUnifiedDiffIsEmptyForIdenticalContentAndShowsChanges(t *testing.T) {
 // the chapter starts with a baseline that matches.
 func backportFixture(t *testing.T, source string) (string, Config) {
 	t.Helper()
-	root := paperFixture(t, "chapters:\n  - 01-chapter.md\n")
+	root := paperFixture(t, "bibliography: references.yaml\nchapters:\n  - 01-chapter.md\n")
 	writeFile(t, root, "01-chapter.md", source)
 	writeFile(t, root, filepath.Join("fig", "x.png"), "")
 

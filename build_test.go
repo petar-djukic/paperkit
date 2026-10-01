@@ -199,32 +199,6 @@ func TestDedupeKeepsFirstOccurrenceOrder(t *testing.T) {
 	}
 }
 
-func TestConfigFilterArgs(t *testing.T) {
-	config := Config{Filters: []string{"templates/a.lua", "templates/b.lua"}}
-	got := config.filterArgs()
-	want := []string{"--lua-filter=templates/a.lua", "--lua-filter=templates/b.lua"}
-	if len(got) != len(want) {
-		t.Fatalf("filterArgs() = %v, want %v", got, want)
-	}
-	for index := range want {
-		if got[index] != want[index] {
-			t.Errorf("filterArgs()[%d] = %q, want %q", index, got[index], want[index])
-		}
-	}
-	if len(Config{}.filterArgs()) != 0 {
-		t.Error("a paper with no filters produced arguments")
-	}
-}
-
-func TestLoadConfigRejectsMissingFilter(t *testing.T) {
-	root := paperFixture(t, "chapters:\n  - 01-intro.md\nfilters:\n  - templates/absent.lua\n", "01-intro.md")
-
-	_, err := LoadConfig(root)
-	if err == nil || !strings.Contains(err.Error(), "absent.lua") {
-		t.Errorf("missing filter error = %v", err)
-	}
-}
-
 func TestLoadConfigDefaultsToIEEEtran(t *testing.T) {
 	root := paperFixture(t, "chapters:\n  - 01-intro.md\n", "01-intro.md")
 

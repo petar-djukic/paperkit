@@ -24,9 +24,9 @@ func TestLoadConfigAppliesDefaults(t *testing.T) {
 		{"BuildDir", config.BuildDir, "build"},
 		{"Output", config.Output, "paper.pdf"},
 		{"Preamble", config.Preamble, filepath.Join("templates", "ieee-preamble.tex")},
-		// A paper that names no engine keeps converting through pandoc, which
-		// is what lets papers move over one at a time.
-		{"Engine", config.Engine, EnginePandoc},
+		// A paper that names no engine converts through md-to-tex, the only
+		// engine since the pandoc path was removed (GH-588).
+		{"Engine", config.Engine, EngineLibrary},
 	} {
 		if field.got != field.want {
 			t.Errorf("%s = %q, want %q", field.name, field.got, field.want)
@@ -184,6 +184,7 @@ func paperFixture(t *testing.T, config string, chapters ...string) string {
 	root := t.TempDir()
 	writeFile(t, root, "paper.yaml", config)
 	writeFile(t, root, filepath.Join("templates", "ieee-preamble.tex"), "% preamble\n")
+	writeFile(t, root, "references.yaml", "- id: lee-2026\n  title: A Cited Work\n")
 	for _, chapter := range chapters {
 		writeFile(t, root, chapter, "# "+chapter+"\n")
 	}
@@ -198,5 +199,14 @@ func writeFile(t *testing.T, root, name, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadConfigRejectsTheRemovedPandocEngine(t *testing.T) {
+	root := paperFixture(t, "engine: pandoc\nchapters:\n  - 01-intro.md\n", "01-intro.md")
+
+	_, err := LoadConfig(root)
+	if err == nil || !strings.Contains(err.Error(), "only engine") {
+		t.Errorf("engine: pandoc error = %v, want a rejection naming the only engine", err)
 	}
 }
