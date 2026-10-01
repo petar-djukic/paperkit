@@ -139,8 +139,7 @@ func TestReconcileRefusesTexWithNoBaseline(t *testing.T) {
 }
 
 func TestGenerateTexReportsConflictsAndDispositions(t *testing.T) {
-	requirePandoc(t)
-	root := paperFixture(t, "chapters:\n  - 01-clean.md\n  - 02-orphan.md\n")
+	root := paperFixture(t, "bibliography: references.yaml\nchapters:\n  - 01-clean.md\n  - 02-orphan.md\n")
 	writeFile(t, root, "01-clean.md", "# Clean\n")
 	writeFile(t, root, "02-orphan.md", "# Orphan\n")
 	// Give the second chapter tex with no baseline.
@@ -171,8 +170,7 @@ func TestGenerateTexReportsConflictsAndDispositions(t *testing.T) {
 }
 
 func TestGenerateTexIsStableAcrossRepeatedRuns(t *testing.T) {
-	requirePandoc(t)
-	root := paperFixture(t, "chapters:\n  - 01-first.md\n")
+	root := paperFixture(t, "bibliography: references.yaml\nchapters:\n  - 01-first.md\n")
 	writeFile(t, root, "01-first.md", "# First\n\nProse.\n")
 
 	config, err := LoadConfig(root)
@@ -233,7 +231,7 @@ func TestDispositionStringsAreDistinct(t *testing.T) {
 
 func mergeFixture(t *testing.T) (string, Config) {
 	t.Helper()
-	root := paperFixture(t, "chapters:\n  - 01-chapter.md\n", "01-chapter.md")
+	root := paperFixture(t, "bibliography: references.yaml\nchapters:\n  - 01-chapter.md\n", "01-chapter.md")
 	config, err := LoadConfig(root)
 	if err != nil {
 		t.Fatal(err)
