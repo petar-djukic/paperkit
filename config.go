@@ -1,7 +1,8 @@
-// Package paperkit builds the repository's papers: markdown chapters are the
-// source of truth, LaTeX under tex/ is a hand-editable intermediate, and
-// latexmk produces the PDF. Every paper directory drives the same targets
-// through a thin magefile plus a paper.yaml.
+// Package paperkit builds a paper directory: markdown chapters are the source
+// of truth, LaTeX under tex/ is a hand-editable intermediate, and latexmk
+// produces the PDF. Every paper drives the same targets through a thin
+// magefile plus a paper.yaml, and a paper directory carries everything its
+// build reads, so a copy of it builds anywhere this module is fetchable.
 //
 // The forward path converts through github.com/petar-djukic/md-to-tex and
 // assembles the fragments into a container document. It is the only engine:
@@ -68,13 +69,14 @@ type Config struct {
 	DocumentClass string `yaml:"document_class"`
 	ClassOptions  string `yaml:"class_options"`
 
-	// Bibliography is the shared CSL-YAML corpus, relative to the paper
-	// directory. Every paper cites from the one database at the repository
-	// root rather than keeping a private copy.
+	// Bibliography is the paper's CSL-YAML corpus, relative to the paper
+	// directory. Each paper carries its own database, so a copied paper
+	// directory still resolves every citation.
 	Bibliography string `yaml:"bibliography"`
 
-	// RefsTool converts that corpus to BibTeX, relative to the paper
-	// directory.
+	// RefsTool converts that corpus to BibTeX: a package path this module
+	// provides (the default) or a filesystem path relative to the paper
+	// directory, either way handed to go run.
 	RefsTool string `yaml:"refs_tool"`
 
 	// Engine names what converts markdown to LaTeX on the forward path.
@@ -131,10 +133,10 @@ func (c *Config) applyDefaults() {
 		c.ClassOptions = "journal"
 	}
 	if c.Bibliography == "" {
-		c.Bibliography = filepath.Join("..", "references.yaml")
+		c.Bibliography = "references.yaml"
 	}
 	if c.RefsTool == "" {
-		c.RefsTool = filepath.Join("..", "cmd", "refs2bib")
+		c.RefsTool = "github.com/petar-djukic/paperkit/cmd/refs2bib"
 	}
 	if c.Engine == "" {
 		c.Engine = EngineLibrary

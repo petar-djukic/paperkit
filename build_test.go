@@ -209,11 +209,13 @@ func TestLoadConfigDefaultsToIEEEtran(t *testing.T) {
 	if config.DocumentClass != "IEEEtran" || config.ClassOptions != "journal" {
 		t.Errorf("class = %s[%s], want IEEEtran[journal]", config.DocumentClass, config.ClassOptions)
 	}
-	if config.Bibliography != filepath.Join("..", "references.yaml") {
-		t.Errorf("Bibliography = %q, want the shared corpus", config.Bibliography)
+	// Both defaults stay inside the paper directory: a default that reaches
+	// into a parent is exactly what keeps a copied paper from building.
+	if config.Bibliography != "references.yaml" {
+		t.Errorf("Bibliography = %q, want the paper's own corpus", config.Bibliography)
 	}
-	if config.RefsTool != filepath.Join("..", "cmd", "refs2bib") {
-		t.Errorf("RefsTool = %q", config.RefsTool)
+	if config.RefsTool != "github.com/petar-djukic/paperkit/cmd/refs2bib" {
+		t.Errorf("RefsTool = %q, want this module's converter", config.RefsTool)
 	}
 }
 
