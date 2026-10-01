@@ -57,10 +57,16 @@ func oneLine(v interface{}) string {
 	return esc(strings.Join(strings.Fields(str(v)), " "))
 }
 
-// okey orders unit ids: S1 -> (1,0), S2.3 -> (2,3).
+// okey orders unit ids: S1 -> (1,0), S2.3 -> (2,3). Letter units are the
+// appendices (SA, SB, SC) and sort after every numbered unit, alphabetically,
+// because Atoi on a letter would otherwise put them at zero, ahead of the
+// body.
 func okey(u string) (int, int) {
 	p := strings.SplitN(u[1:], ".", 2)
-	major, _ := strconv.Atoi(p[0])
+	major, err := strconv.Atoi(p[0])
+	if err != nil && p[0] != "" {
+		major = 1<<20 + int(p[0][0])
+	}
 	minor := 0
 	if len(p) > 1 {
 		minor, _ = strconv.Atoi(p[1])
@@ -328,14 +334,7 @@ func main() {
 	for u := range srds {
 		units = append(units, u)
 	}
-	sort.Slice(units, func(i, j int) bool {
-		ai, bi := okey(units[i])
-		aj, bj := okey(units[j])
-		if ai != aj {
-			return ai < aj
-		}
-		return bi < bj
-	})
+	sortUnits(units)
 
 	if *format == "md" {
 		emitMarkdown(vis, units, srds)
@@ -598,4 +597,17 @@ func figureArtifact(declared string) string {
 		return strings.TrimSuffix(name, ".d2") + ".pdf"
 	}
 	return name
+}
+
+// sortUnits orders unit ids by okey: body sections numerically, then the
+// lettered appendices.
+func sortUnits(units []string) {
+	sort.Slice(units, func(i, j int) bool {
+		ai, bi := okey(units[i])
+		aj, bj := okey(units[j])
+		if ai != aj {
+			return ai < aj
+		}
+		return bi < bj
+	})
 }

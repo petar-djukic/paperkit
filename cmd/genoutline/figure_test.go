@@ -14,3 +14,14 @@ func TestFigureArtifactMapsD2SourcesToTheirCompiledPDF(t *testing.T) {
 		}
 	}
 }
+
+func TestOkeyOrdersAppendicesAfterTheBody(t *testing.T) {
+	units := []string{"SA", "S1", "SC", "S2.3", "S9", "SB", "S2"}
+	want := []string{"S1", "S2", "S2.3", "S9", "SA", "SB", "SC"}
+	sortUnits(units)
+	for i := range want {
+		if units[i] != want[i] {
+			t.Fatalf("order = %v, want %v", units, want)
+		}
+	}
+}
