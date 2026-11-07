@@ -72,16 +72,38 @@ func okey(u string) (int, int) {
 	return major, minor
 }
 
-func loadYAML(path string) (map[string]interface{}, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+// VisionPath finds the paper's VISION document, in either form.
+func VisionPath(docs string) (string, error) {
+	yamlPath, mdPath := filepath.Join(docs, "VISION.yaml"), filepath.Join(docs, "VISION.md")
+	_, yamlErr := os.Stat(yamlPath)
+	_, mdErr := os.Stat(mdPath)
+	switch {
+	case yamlErr == nil && mdErr == nil:
+		return "", fmt.Errorf("%s and %s both exist; keep one", yamlPath, mdPath)
+	case mdErr == nil:
+		return mdPath, nil
 	}
-	var d map[string]interface{}
-	if err := yaml.Unmarshal(data, &d); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+	return yamlPath, nil
+}
+
+// SRDPaths lists the paper's SRD files, in either form, sorted by name. A
+// document present in both forms is an error: the outline would otherwise
+// read whichever sorted last.
+func SRDPaths(docs string) ([]string, error) {
+	yamlFiles, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.yaml"))
+	mdFiles, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.md"))
+	stems := map[string]bool{}
+	for _, f := range yamlFiles {
+		stems[strings.TrimSuffix(f, ".yaml")] = true
 	}
-	return d, nil
+	for _, f := range mdFiles {
+		if stems[strings.TrimSuffix(f, ".md")] {
+			return nil, fmt.Errorf("%s exists as both .yaml and .md; keep one", strings.TrimSuffix(f, ".md"))
+		}
+	}
+	files := append(yamlFiles, mdFiles...)
+	sort.Strings(files)
+	return files, nil
 }
 
 func m(v interface{}) map[string]interface{} {
@@ -311,20 +333,26 @@ const (
 )
 
 // Render generates the outline of the paper whose docs directory (holding
-// VISION.yaml and srd/) is docs.
+// VISION and srd/, in either form) is docs.
 func Render(docs string, format Format) ([]byte, error) {
 	if format != TeX && format != Markdown {
 		return nil, fmt.Errorf("outline format %q: want %q or %q", format, TeX, Markdown)
 	}
-	vis, err := loadYAML(filepath.Join(docs, "VISION.yaml"))
+	visionPath, err := VisionPath(docs)
 	if err != nil {
 		return nil, err
 	}
-	files, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.yaml"))
-	sort.Strings(files)
+	vis, err := Load(visionPath)
+	if err != nil {
+		return nil, err
+	}
+	files, err := SRDPaths(docs)
+	if err != nil {
+		return nil, err
+	}
 	srds := map[string]map[string]interface{}{}
 	for _, f := range files {
-		d, err := loadYAML(f)
+		d, err := Load(f)
 		if err != nil {
 			return nil, err
 		}
