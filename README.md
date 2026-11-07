@@ -10,7 +10,7 @@ flowchart LR
     TEX -->|latexmk, xelatex| PDF[build/paper.pdf]
     REFS[references.yaml] -->|bib| BIB[tex/references.bib]
     D2[figure sources *.d2] -->|d2| FIGS[figure PDFs, diagram PNGs]
-    SRD[docs/srd/*.yaml] -->|srd| OUT[build/outline.pdf]
+    SRD[docs/srd/*.md] -->|srd| OUT[build/outline.pdf]
 ```
 
 ## What a paper directory contains
@@ -21,7 +21,7 @@ flowchart LR
 | `NN-slug.md` | chapters, `00-title-page.md` first; frontmatter carries title, author, abstract |
 | `references.yaml` | the paper's own CSL-YAML corpus |
 | `d2/` | figure sources, compiled to vector PDF beside each source |
-| `docs/srd/` | section requirements documents, for papers drafted requirements-first |
+| `docs/srd/` | section requirements documents, for papers drafted requirements-first, in the markdown form [srd/FORMAT.md](srd/FORMAT.md) defines |
 | `tex/` | generated LaTeX: build output, not committed |
 | `templates/` | the venue preamble and class files |
 | `magefile.go` | imports the shared targets |
@@ -61,7 +61,7 @@ Conversion goes through the `mdtotex` package, a pure function from markdown byt
 
 `Audit` also compares each entry of the paper's `references.yaml` with the entry of the same id in the corpus, and reports the ones that differ without changing either. Either side may be the better record, since a paper's copy is often the one curated for print, so reconciling them is the author's decision.
 
-The `bib` package converts the CSL-YAML corpus to BibTeX, normalizing date forms and organization authors that break `IEEEtran.bst`. The `srd` package renders a paper's section requirements documents into an outline. `cmd/refs2bib` and `cmd/genoutline` run the same code by hand.
+The `bib` package converts the CSL-YAML corpus to BibTeX, normalizing date forms and organization authors that break `IEEEtran.bst`. The `srd` package reads a paper's section requirements documents and its VISION, in the markdown form [srd/FORMAT.md](srd/FORMAT.md) defines or in the YAML they were first written in, and renders them into an outline. `cmd/refs2bib` and `cmd/genoutline` run the same code by hand; `cmd/srd2md` converts a paper's YAML documents to markdown, proving each conversion before it writes.
 
 ## Use
 
