@@ -71,10 +71,46 @@ type Config struct {
 	// directory still resolves every citation.
 	Bibliography string `yaml:"bibliography"`
 
-	// RefsTool converts that corpus to BibTeX: a package path this module
-	// provides (the default) or a filesystem path relative to the paper
-	// directory, either way handed to go run.
-	RefsTool string `yaml:"refs_tool"`
+	// Corpus is the shared reference database the paper's bibliography copies
+	// its entries from, relative to the paper directory. Optional: the audit
+	// reports entries that drifted from it, and only when it is on disk, so a
+	// copied-out paper still audits.
+	Corpus string `yaml:"corpus"`
+
+	// Diagrams is the directory that receives a PNG of every d2 source, for
+	// markdown pages that embed figures. Optional: empty renders none.
+	Diagrams string `yaml:"diagrams"`
+
+	// Outline configures the outline generated from docs/srd/. Optional.
+	Outline OutlineConfig `yaml:"outline"`
+
+	// Wiki configures the single-page HTML wiki. Optional.
+	Wiki WikiConfig `yaml:"wiki"`
+}
+
+// OutlineConfig selects how the outline renders and compiles.
+type OutlineConfig struct {
+	// Format is tex (a standalone IEEEtran document compiled in the paper's
+	// tex directory) or md (a markdown chapter compiled as a one-chapter
+	// paper with the paper's own class and preamble).
+	Format string `yaml:"format"`
+
+	// ClassOptions overrides the paper's class options for an md outline, so
+	// a manuscript built in a referee layout can outline in the plain one.
+	ClassOptions string `yaml:"class_options"`
+}
+
+// WikiConfig names the page template and the markdown that fills it.
+type WikiConfig struct {
+	// Template is an HTML file holding one {{NAME}} placeholder per section.
+	Template string `yaml:"template"`
+
+	// Sections maps each placeholder name to the markdown file rendered
+	// into it.
+	Sections map[string]string `yaml:"sections"`
+
+	// Output is the HTML file written, relative to the paper directory.
+	Output string `yaml:"output"`
 }
 
 // LoadConfig reads paper.yaml from root and applies defaults. A config naming
@@ -123,8 +159,8 @@ func (c *Config) applyDefaults() {
 	if c.Bibliography == "" {
 		c.Bibliography = "references.yaml"
 	}
-	if c.RefsTool == "" {
-		c.RefsTool = "github.com/petar-djukic/paperkit/cmd/refs2bib"
+	if c.Wiki.Output == "" {
+		c.Wiki.Output = filepath.Join(c.BuildDir, "wiki.html")
 	}
 }
 
