@@ -3,7 +3,6 @@ package paperkit
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -40,12 +39,4 @@ func GenerateTex(root string, config Config) error {
 
 func texPath(root string, config Config, chapter string) string {
 	return filepath.Join(root, config.TexDir, TexName(chapter))
-}
-
-func runIn(dir, name string, args ...string) error {
-	command := exec.Command(name, args...)
-	command.Dir = dir
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	return command.Run()
 }

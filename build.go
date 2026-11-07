@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/petar-djukic/paperkit/bib"
 )
 
 // Figures compiles every d2 source in the paper's figure directory to PDF,
@@ -35,20 +37,44 @@ func Figures(root string, config Config) error {
 	return nil
 }
 
-// Bib regenerates the paper's references.bib from the shared CSL-YAML corpus
-// through cmd/refs2bib, which already handles the corpus's date shorthand and
-// mononym authors. It writes next to main.tex so bibtex finds it without a
-// search path.
-func Bib(root string, config Config) error {
-	texDir := filepath.Join(root, config.TexDir)
-	if err := os.MkdirAll(texDir, 0o755); err != nil {
+// Diagrams renders every d2 source in the figure directory to a PNG in the
+// configured diagrams directory, the form markdown pages embed, so a page read
+// on GitHub or in Obsidian shows the same picture the paper compiles to PDF.
+// A paper that configures no diagrams directory renders none.
+func Diagrams(root string, config Config) error {
+	if config.Diagrams == "" {
+		return nil
+	}
+	sources, err := filepath.Glob(filepath.Join(root, config.FigureDir, "*.d2"))
+	if err != nil {
 		return err
 	}
+	sort.Strings(sources)
+	for _, source := range sources {
+		output := filepath.Join(root, config.Diagrams, strings.TrimSuffix(filepath.Base(source), ".d2")+".png")
+		if !outOfDate(source, output) {
+			continue
+		}
+		fmt.Printf("diagrams: d2 %s -> %s\n", filepath.Base(source), filepath.Join(config.Diagrams, filepath.Base(output)))
+		if err := run("d2", source, output); err != nil {
+			return fmt.Errorf("d2 %s: %w", filepath.Base(source), err)
+		}
+		// d2 renames an owner-only temp file into place; the PNG is read by
+		// editors and the wiki, so it gets ordinary file permissions.
+		if err := os.Chmod(output, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Bib regenerates the paper's references.bib from its CSL-YAML corpus. It
+// writes next to main.tex so bibtex finds it without a search path.
+func Bib(root string, config Config) error {
 	output := filepath.Join(config.TexDir, "references.bib")
 	fmt.Printf("bib: %s -> %s\n", config.Bibliography, output)
-	return runIn(root, "go", "run", config.RefsTool,
-		"--yaml", config.Bibliography,
-		"--out", output)
+	_, err := bib.Convert(filepath.Join(root, config.Bibliography), filepath.Join(root, output))
+	return err
 }
 
 // PDF compiles tex/main.tex with latexmk.
@@ -57,16 +83,8 @@ func Bib(root string, config Config) error {
 // math, accented names — that only a Unicode-aware engine renders without
 // per-character setup. latexmk runs with the tex directory as its working
 // directory so \input and the bibliography resolve as written, and drops its
-// aux files into the build directory so tex/ holds sources only.
+// aux files into the build directory so tex/ holds only generated LaTeX.
 func PDF(root string, config Config) error {
-	buildDir := filepath.Join(root, config.BuildDir)
-	if err := os.MkdirAll(buildDir, 0o755); err != nil {
-		return err
-	}
-	outDir, err := filepath.Rel(filepath.Join(root, config.TexDir), buildDir)
-	if err != nil {
-		return err
-	}
 	absoluteRoot, err := filepath.Abs(root)
 	if err != nil {
 		return err
@@ -74,29 +92,43 @@ func PDF(root string, config Config) error {
 	fmt.Printf("pdf: latexmk -xelatex -> %s\n", filepath.Join(config.BuildDir, config.Output))
 	// TEXINPUTS is what makes the figures resolvable. The chapters reference
 	// them relative to the paper directory, latexmk runs in tex/, and with
-	// -outdir a parent-relative \graphicspath stops resolving — the aux files
-	// have to land outside tex/, which holds committed sources, so the search
+	// -outdir a parent-relative \graphicspath stops resolving, so the search
 	// path moves instead of the output.
-	// The container is named explicitly relative to the tex directory:
-	// TEXINPUTS below searches the whole paper tree recursively, and a bare
-	// "main.tex" can resolve to another tex directory's container when a
-	// paper builds more than one (the outline compiles as a one-chapter
-	// paper with its own TexDir).
-	command := exec.Command("latexmk",
-		"-xelatex", "-interaction=nonstopmode", "-halt-on-error",
-		"-outdir="+outDir, "./main.tex")
-	command.Dir = filepath.Join(root, config.TexDir)
-	command.Env = append(os.Environ(), "TEXINPUTS="+absoluteRoot+"//:")
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("latexmk: %w%s", err, logTail(root, config))
-	}
-	if err := CheckMissingChars(filepath.Join(buildDir, "main.log")); err != nil {
+	return latexmk(filepath.Join(root, config.TexDir), filepath.Join(root, config.BuildDir),
+		"main.tex", config.Output, absoluteRoot+"//:")
+}
+
+// latexmk compiles source, a file in texDir, with xelatex, landing the aux
+// files and the PDF in buildDir, and names the PDF output. texinputs is the
+// TeX search path. The source is named relative to texDir: a recursive search
+// path can otherwise resolve a bare name to another tex directory's file of
+// the same name when a paper builds more than one (the md outline compiles as
+// a one-chapter paper with its own tex directory).
+func latexmk(texDir, buildDir, source, output, texinputs string) error {
+	if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		return err
 	}
-	if config.Output != "" && config.Output != "main.pdf" {
-		return os.Rename(filepath.Join(buildDir, "main.pdf"), filepath.Join(buildDir, config.Output))
+	outDir, err := filepath.Rel(texDir, buildDir)
+	if err != nil {
+		return err
+	}
+	command := exec.Command("latexmk",
+		"-xelatex", "-interaction=nonstopmode", "-halt-on-error",
+		"-outdir="+outDir, "./"+source)
+	command.Dir = texDir
+	command.Env = append(os.Environ(), "TEXINPUTS="+texinputs)
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	stem := strings.TrimSuffix(source, filepath.Ext(source))
+	logPath := filepath.Join(buildDir, stem+".log")
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("latexmk: %w%s", err, logTail(logPath))
+	}
+	if err := CheckMissingChars(logPath); err != nil {
+		return err
+	}
+	if output != "" && output != stem+".pdf" {
+		return os.Rename(filepath.Join(buildDir, stem+".pdf"), filepath.Join(buildDir, output))
 	}
 	return nil
 }
@@ -163,6 +195,18 @@ func Audit(root string, config Config) error {
 		for _, match := range logIssue.FindAllString(string(log), -1) {
 			problems = append(problems, "LaTeX log: "+match)
 		}
+	}
+
+	// Drift is reported, not failed: the corpus changes whenever the reference
+	// pipeline runs, and which side of a drifted entry is right is the
+	// author's call (see ReferenceDrift).
+	drift, err := ReferenceDrift(root, config)
+	if err != nil {
+		return err
+	}
+	if len(drift) > 0 {
+		fmt.Printf("audit: %d reference(s) differ from %s: %s\n",
+			len(drift), config.Corpus, strings.Join(drift, ", "))
 	}
 
 	if len(problems) > 0 {
@@ -247,8 +291,8 @@ func figureExists(root string, config Config, name string) bool {
 	return false
 }
 
-func logTail(root string, config Config) string {
-	log, err := os.ReadFile(filepath.Join(root, config.BuildDir, "main.log"))
+func logTail(logPath string) string {
+	log, err := os.ReadFile(logPath)
 	if err != nil {
 		return ""
 	}

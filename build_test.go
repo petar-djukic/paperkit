@@ -212,8 +212,9 @@ func TestLoadConfigDefaultsToIEEEtran(t *testing.T) {
 	if config.Bibliography != "references.yaml" {
 		t.Errorf("Bibliography = %q, want the paper's own corpus", config.Bibliography)
 	}
-	if config.RefsTool != "github.com/petar-djukic/paperkit/cmd/refs2bib" {
-		t.Errorf("RefsTool = %q, want this module's converter", config.RefsTool)
+	// The shared corpus lives outside the paper, so it is never a default.
+	if config.Corpus != "" {
+		t.Errorf("Corpus = %q, want no default", config.Corpus)
 	}
 }
 
