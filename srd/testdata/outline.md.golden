@@ -1,0 +1,31 @@
+<!-- Generated from docs/srd/*.md by cmd/genoutline -format md;
+     regenerate with `mage outline`. Edit the SRDs, not this file. -->
+
+# Fixture: every field
+
+The goal of this section is to show every field in one document.
+
+- **G1.1** The first goal.
+- **G2.1** The second goal, folded over two lines.
+
+The content of this section first paragraph of the objective. Second paragraph, with Section 2.1 kept.
+
+- The first thing to say.
+- A planned table goes here.
+
+Planned artifacts: Table 2 (planned). This unit feeds S3, S4. References: [@lee-2026], [@kim-2025].
+
+| Name | Value | unit |
+|---|---|
+| alpha | 1 |
+| beta | a | b |
+
+Table: the comparison {#tab:outline-2-1}
+
+*Table planned: a header and no rows (columns: A; B).*
+
+*Table planned: no columns yet.*
+
+*Figure ready (d2/overview.d2): the whole system.*
+
+*Figure planned: the levels.*

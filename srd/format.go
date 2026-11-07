@@ -1,7 +1,6 @@
 package srd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,8 +11,9 @@ import (
 )
 
 // The markdown form of an SRD or VISION document is defined in FORMAT.md.
-// The reader returns the same map the YAML decoder returns, so everything
-// downstream of Load works on either form unchanged.
+// The reader returns the decoded document as a map, the shape the YAML form
+// the papers were first written in decoded to, so everything downstream of
+// Load reads plain maps.
 
 // DocKind names the two document types the format covers.
 type DocKind int
@@ -52,9 +52,9 @@ type fieldSpec struct {
 	name    string
 	heading string
 	kind    fieldKind
-	// locked fields are contract values: the writer wraps them in a block
-	// lock so prose tooling, which treats a lock region as opaque, never
-	// rewrites them.
+	// locked fields are contract values, written inside a block lock so
+	// prose tooling, which treats a lock region as opaque, never rewrites
+	// them.
 	locked bool
 }
 
@@ -106,359 +106,20 @@ func specFor(kind DocKind, name string) (fieldSpec, bool) {
 	return fieldSpec{}, false
 }
 
-// Load reads an SRD or VISION document in either form, by extension.
+// Load reads an SRD or VISION document in the markdown form.
 func Load(path string) (map[string]interface{}, error) {
+	if !strings.HasSuffix(path, ".md") {
+		return nil, fmt.Errorf("%s: SRDs and VISION are markdown (srd/FORMAT.md)", path)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	if strings.HasSuffix(path, ".md") {
-		doc, err := ParseMarkdown(data, KindOf(path))
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
-		}
-		return doc, nil
-	}
-	var doc map[string]interface{}
-	if err := yaml.Unmarshal(data, &doc); err != nil {
+	doc, err := ParseMarkdown(data, KindOf(path))
+	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return doc, nil
-}
-
-// ---------------------------------------------------------------- writing
-
-// ToMarkdown renders a YAML SRD or VISION document in the markdown form. It
-// works from the YAML node tree, so key order and comments survive: each
-// comment lands in an HTML comment under the heading of the field it sat in.
-func ToMarkdown(source []byte, kind DocKind) ([]byte, error) {
-	var document yaml.Node
-	if err := yaml.Unmarshal(source, &document); err != nil {
-		return nil, err
-	}
-	if document.Kind != yaml.DocumentNode || len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("not a YAML mapping")
-	}
-	root := document.Content[0]
-
-	var out bytes.Buffer
-	header := []string{document.HeadComment, root.HeadComment}
-	var meta *yaml.Node
-	for index := 0; index+1 < len(root.Content); index += 2 {
-		if root.Content[index].Value == "meta" {
-			meta = root.Content[index+1]
-			header = append(header, root.Content[index].HeadComment)
-			root.Content[index].HeadComment = ""
-		}
-	}
-	if meta == nil {
-		return nil, fmt.Errorf("no meta block")
-	}
-	frontMatter, err := encodeBlock(meta)
-	if err != nil {
-		return nil, err
-	}
-	out.WriteString("---\n")
-	out.Write(frontMatter)
-	out.WriteString("---\n")
-	writeComment(&out, header...)
-
-	for index := 0; index+1 < len(root.Content); index += 2 {
-		key, value := root.Content[index], root.Content[index+1]
-		if key.Value == "meta" {
-			continue
-		}
-		spec, ok := specFor(kind, key.Value)
-		if !ok {
-			return nil, fmt.Errorf("field %q is not in the format (FORMAT.md)", key.Value)
-		}
-		var decoded interface{}
-		if err := value.Decode(&decoded); err != nil {
-			return nil, fmt.Errorf("%s: %w", key.Value, err)
-		}
-		body, err := renderField(spec, decoded)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", key.Value, err)
-		}
-		fmt.Fprintf(&out, "\n<!-- field: %s -->\n## %s\n", spec.name, spec.heading)
-		writeComment(&out, collectComments(key, value)...)
-		if body == "" {
-			continue
-		}
-		out.WriteString("\n")
-		if spec.locked {
-			out.WriteString("<!-- lock -->\n" + body + "<!-- /lock -->\n")
-		} else {
-			out.WriteString(body)
-		}
-	}
-	return out.Bytes(), nil
-}
-
-// encodeBlock writes a mapping as block-style YAML, whatever style the source
-// used, so the front matter reads one key per line.
-func encodeBlock(node *yaml.Node) ([]byte, error) {
-	var setBlock func(*yaml.Node)
-	setBlock = func(n *yaml.Node) {
-		if n.Kind == yaml.MappingNode {
-			n.Style = 0
-		}
-		for _, child := range n.Content {
-			setBlock(child)
-		}
-	}
-	setBlock(node)
-	var out bytes.Buffer
-	encoder := yaml.NewEncoder(&out)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(node); err != nil {
-		return nil, err
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
-}
-
-func collectComments(nodes ...*yaml.Node) []string {
-	var comments []string
-	var walk func(*yaml.Node)
-	walk = func(n *yaml.Node) {
-		comments = append(comments, n.HeadComment, n.LineComment)
-		for _, child := range n.Content {
-			walk(child)
-		}
-		comments = append(comments, n.FootComment)
-	}
-	for _, n := range nodes {
-		walk(n)
-	}
-	return comments
-}
-
-// writeComment emits YAML comments as one HTML comment, without their #.
-func writeComment(out *bytes.Buffer, comments ...string) {
-	var lines []string
-	for _, comment := range comments {
-		for _, line := range strings.Split(comment, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			line = strings.TrimSpace(strings.TrimPrefix(line, "#"))
-			lines = append(lines, strings.ReplaceAll(line, "-->", "->"))
-		}
-	}
-	if len(lines) == 0 {
-		return
-	}
-	out.WriteString("\n<!--\n" + strings.Join(lines, "\n") + "\n-->\n")
-}
-
-func renderField(spec fieldSpec, value interface{}) (string, error) {
-	var b strings.Builder
-	switch spec.kind {
-	case proseField:
-		text, ok := value.(string)
-		if !ok {
-			return "", fmt.Errorf("want text, have %T", value)
-		}
-		for index, paragraph := range paragraphs(text) {
-			if index > 0 {
-				b.WriteString("\n")
-			}
-			b.WriteString(paragraph + "\n")
-		}
-	case listField:
-		items, err := asList(value)
-		if err != nil {
-			return "", err
-		}
-		for _, item := range items {
-			text, ok := item.(string)
-			if !ok {
-				return "", fmt.Errorf("want a list of text, have a %T item", item)
-			}
-			b.WriteString("- " + collapse(text) + "\n")
-		}
-	case goalsField:
-		records, err := asRecords(value, "id", "goal")
-		if err != nil {
-			return "", err
-		}
-		for _, r := range records {
-			b.WriteString("- **" + str(r["id"]) + "** " + collapse(str(r["goal"])) + "\n")
-		}
-	case citationsField:
-		records, err := asRecords(value, "id", "role", "note")
-		if err != nil {
-			return "", err
-		}
-		for _, r := range records {
-			b.WriteString("- **" + str(r["id"]) + "**")
-			if role, ok := r["role"]; ok {
-				b.WriteString(" (" + str(role) + ")")
-			}
-			if note, ok := r["note"]; ok {
-				b.WriteString(":")
-				if text := collapse(str(note)); text != "" {
-					b.WriteString(" " + text)
-				}
-			}
-			b.WriteString("\n")
-		}
-	case priorField:
-		records, err := asRecords(value, "path", "offers")
-		if err != nil {
-			return "", err
-		}
-		for _, r := range records {
-			b.WriteString("- `" + str(r["path"]) + "`: " + collapse(str(r["offers"])) + "\n")
-		}
-	case contentField:
-		records, err := asRecords(value, "say", "carried_by", "artifact")
-		if err != nil {
-			return "", err
-		}
-		for index, r := range records {
-			say := collapse(str(r["say"]))
-			if err := checkSay(say); err != nil {
-				return "", fmt.Errorf("item %d: %w", index+1, err)
-			}
-			if index > 0 {
-				b.WriteString("\n")
-			}
-			b.WriteString(say)
-			if carried, ok := r["carried_by"]; ok {
-				ids, err := asStrings(carried)
-				if err != nil {
-					return "", fmt.Errorf("item %d: carried_by: %w", index+1, err)
-				}
-				if len(ids) == 0 {
-					return "", fmt.Errorf("item %d: carried_by is empty; remove the key", index+1)
-				}
-				b.WriteString(" " + citeGroup(ids))
-			}
-			b.WriteString("\n")
-			if artifact, ok := r["artifact"]; ok {
-				b.WriteString("<!-- artifact: " + strings.ReplaceAll(collapse(str(artifact)), "-->", "->") + " -->\n")
-			}
-		}
-	case linksField, inputsField:
-		fields, ok := value.(map[string]interface{})
-		if !ok {
-			return "", fmt.Errorf("want a mapping, have %T", value)
-		}
-		for _, name := range sortedKeys(fields) {
-			if spec.kind == linksField {
-				ids, err := asStrings(fields[name])
-				if err != nil {
-					return "", fmt.Errorf("%s: %w", name, err)
-				}
-				b.WriteString(strings.TrimRight("- "+name+": "+strings.Join(ids, ", "), " ") + "\n")
-			} else {
-				b.WriteString(strings.TrimRight("- "+name+": "+collapse(str(fields[name])), " ") + "\n")
-			}
-		}
-	case tablesField:
-		records, err := asRecords(value, "shows", "columns", "rows", "status", "wide")
-		if err != nil {
-			return "", err
-		}
-		for index, r := range records {
-			if index > 0 {
-				b.WriteString("\n")
-			}
-			if err := renderTable(&b, r); err != nil {
-				return "", fmt.Errorf("table %d: %w", index+1, err)
-			}
-		}
-	case figuresField:
-		records, err := asRecords(value, "file", "status", "shows", "wide")
-		if err != nil {
-			return "", err
-		}
-		for _, r := range records {
-			b.WriteString("- `" + str(r["file"]) + "`")
-			if attrs := attributes(r, "status", "wide"); attrs != "" {
-				b.WriteString(" (" + attrs + ")")
-			}
-			b.WriteString(": " + collapse(str(r["shows"])) + "\n")
-		}
-	}
-	return b.String(), nil
-}
-
-func renderTable(b *strings.Builder, r map[string]interface{}) error {
-	attrs := attributes(r, "status", "wide")
-	for _, key := range []string{"columns", "rows"} {
-		if v, ok := r[key]; ok {
-			if items, _ := v.([]interface{}); len(items) == 0 {
-				attrs = joinAttr(attrs, key+": []")
-			}
-		}
-	}
-	if attrs == "" {
-		b.WriteString("<!-- table -->\n")
-	} else {
-		b.WriteString("<!-- table | " + strings.ReplaceAll(attrs, ", ", " | ") + " -->\n")
-	}
-	if shows, ok := r["shows"]; ok {
-		b.WriteString("Table: " + collapse(str(shows)) + "\n")
-	}
-	columns, err := asStrings(r["columns"])
-	if err != nil {
-		return fmt.Errorf("columns: %w", err)
-	}
-	if len(columns) == 0 {
-		return nil
-	}
-	b.WriteString("\n" + tableRow(columns) + "\n|" + strings.Repeat("---|", len(columns)) + "\n")
-	rows, err := asList(r["rows"])
-	if err != nil {
-		return fmt.Errorf("rows: %w", err)
-	}
-	for _, row := range rows {
-		cells, err := asStrings(row)
-		if err != nil {
-			return fmt.Errorf("row: %w", err)
-		}
-		b.WriteString(tableRow(cells) + "\n")
-	}
-	return nil
-}
-
-func tableRow(cells []string) string {
-	escaped := make([]string, len(cells))
-	for index, cell := range cells {
-		escaped[index] = strings.ReplaceAll(collapse(cell), "|", `\|`)
-	}
-	return "| " + strings.Join(escaped, " | ") + " |"
-}
-
-// attributes renders the named keys a record carries as "key: value" pairs.
-func attributes(r map[string]interface{}, keys ...string) string {
-	var attrs string
-	for _, key := range keys {
-		if v, ok := r[key]; ok {
-			attrs = joinAttr(attrs, key+": "+fmt.Sprint(v))
-		}
-	}
-	return attrs
-}
-
-func joinAttr(attrs, attr string) string {
-	if attrs == "" {
-		return attr
-	}
-	return attrs + ", " + attr
-}
-
-func citeGroup(ids []string) string {
-	if len(ids) == 0 {
-		return ""
-	}
-	return "[@" + strings.Join(ids, "; @") + "]"
 }
 
 // ---------------------------------------------------------------- reading
@@ -467,7 +128,6 @@ var (
 	fieldTag     = regexp.MustCompile(`^<!-- field: ([a-z_]+) -->$`)
 	artifactTag  = regexp.MustCompile(`^<!-- artifact: (.*) -->$`)
 	citeGroupRe  = regexp.MustCompile(`\s*\[@[^\]]*\]`)
-	sayMarker    = regexp.MustCompile(`^(- |\* |\+ |[0-9]+\. |#|>|\||<!--)`)
 	tableTag     = regexp.MustCompile(`^<!-- table(?: \| (.*))? -->$`)
 	goalLine     = regexp.MustCompile(`^- \*\*([^*]+)\*\* ?(.*)$`)
 	citationLine = regexp.MustCompile(`^- \*\*([^*]+)\*\*(?: \(([^)]*)\))?(:(?: (.*))?)?$`)
@@ -776,45 +436,7 @@ func splitRow(line string) []interface{} {
 	return append(cells, strings.TrimSpace(cell.String()))
 }
 
-// ---------------------------------------------------------------- equality
-
-// Normalize returns a copy of a decoded document with every string's
-// whitespace collapsed to single spaces. The markdown form keeps text, not
-// line layout, so two forms of one document are equal exactly when their
-// normalized maps are; every consumer reads the text through oneLine anyway.
-func Normalize(v interface{}) interface{} {
-	switch t := v.(type) {
-	case string:
-		return collapse(t)
-	case []interface{}:
-		out := make([]interface{}, len(t))
-		for index, item := range t {
-			out[index] = Normalize(item)
-		}
-		return out
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(t))
-		for key, item := range t {
-			out[key] = Normalize(item)
-		}
-		return out
-	}
-	return v
-}
-
 // ---------------------------------------------------------------- helpers
-
-var blankLine = regexp.MustCompile(`\n\s*\n`)
-
-func paragraphs(text string) []string {
-	var out []string
-	for _, block := range blankLine.Split(strings.TrimSpace(text), -1) {
-		if line := collapse(block); line != "" {
-			out = append(out, line)
-		}
-	}
-	return out
-}
 
 // blocks splits lines into blank-line-separated groups, each line trimmed.
 func blocks(lines []string) [][]string {
@@ -833,19 +455,6 @@ func blocks(lines []string) [][]string {
 	return out
 }
 
-// checkSay rejects a say the markdown form could not carry unambiguously: one
-// holding its own citation group, whose carried_by would absorb it, or one
-// opening with a list, heading, quote, table or comment marker.
-func checkSay(say string) error {
-	if strings.Contains(say, "[@") {
-		return fmt.Errorf("say holds a [@...] citation group; move the ids to carried_by")
-	}
-	if sayMarker.MatchString(say) {
-		return fmt.Errorf("say opens with a markdown marker: %.40q", say)
-	}
-	return nil
-}
-
 func nonBlank(lines []string) []string {
 	var out []string
 	for _, line := range lines {
@@ -854,77 +463,6 @@ func nonBlank(lines []string) []string {
 		}
 	}
 	return out
-}
-
-func asList(v interface{}) ([]interface{}, error) {
-	if v == nil {
-		return nil, nil
-	}
-	items, ok := v.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("want a list, have %T", v)
-	}
-	return items, nil
-}
-
-func asStrings(v interface{}) ([]string, error) {
-	items, err := asList(v)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, len(items))
-	for index, item := range items {
-		text, ok := item.(string)
-		if !ok {
-			return nil, fmt.Errorf("want text, have a %T item", item)
-		}
-		out[index] = text
-	}
-	return out, nil
-}
-
-// asRecords reads a list of mappings whose keys are all among allowed.
-func asRecords(v interface{}, allowed ...string) ([]map[string]interface{}, error) {
-	items, err := asList(v)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]map[string]interface{}, len(items))
-	for index, item := range items {
-		record, ok := item.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("item %d: want a mapping, have %T", index+1, item)
-		}
-		for key := range record {
-			if !contains(allowed, key) {
-				return nil, fmt.Errorf("item %d: key %q is not in the format (FORMAT.md)", index+1, key)
-			}
-		}
-		out[index] = record
-	}
-	return out, nil
-}
-
-func contains(values []string, value string) bool {
-	for _, v := range values {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
-func sortedKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	for i := 1; i < len(keys); i++ {
-		for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
-			keys[j], keys[j-1] = keys[j-1], keys[j]
-		}
-	}
-	return keys
 }
 
 // collapse joins a string's words with single spaces. It is the plain-text

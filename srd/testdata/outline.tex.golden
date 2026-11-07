@@ -1,0 +1,80 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{xurl}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{array}
+\usepackage{newunicodechar}
+\newunicodechar{ }{\,}
+\renewcommand{\tabularxcolumn}[1]{>{\raggedright\arraybackslash}p{#1}}
+\graphicspath{{../fig/}{fig/}}
+\hyphenation{auto-gen-ic}
+\begin{document}
+\title{Outline: Fixture Paper}
+\author{Petar Djukic%
+\thanks{Outline generated from the section requirements documents (SRDs) of testdata; regenerate with go run ../cmd/genoutline.}}
+\markboth{Working outline, August 2026}{Djukic: Outline}
+\maketitle
+\begin{abstract}
+An abstract.
+\end{abstract}
+
+\section{Fixture: every field}
+\label{sec:2}
+The goal of this section is to show every field in one document.
+\begin{itemize}
+  \item \textbf{G1.1} The first goal.
+  \item \textbf{G2.1} The second goal, folded over two lines.
+\end{itemize}
+
+The content of this section first paragraph of the objective. Second paragraph, with Section 2.1 kept.
+\begin{itemize}
+  \item The first thing to say.
+  \item A planned table goes here.
+\end{itemize}
+
+Planned artifacts: Table 2 (planned). This unit feeds Sections \ref{sec:3}, \ref{sec:4}. References: \cite{lee-2026,kim-2025}.
+
+\begin{table}[H]
+\centering
+\caption{the comparison}
+\begin{tabularx}{\columnwidth}{@{}XX@{}}
+\toprule
+\textbf{Name} & \textbf{Value | unit} \\
+\midrule
+alpha & 1 \\
+beta & a | b \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{a header and no rows}
+\begin{tabular}{@{}l@{}}\hline \textit{[table planned]} \\ \hline\end{tabular}
+\end{table}
+
+\begin{table*}[!t]
+\centering
+\caption{no columns yet}
+\begin{tabular}{@{}l@{}}\hline \textit{[table planned]} \\ \hline\end{tabular}
+\end{table*}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{overview.pdf}
+\caption{the whole system}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox[c][3\baselineskip][c]{0.85\columnwidth}{\centering\textit{[figure planned]}}}
+\caption{the levels}
+\end{figure}
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}
