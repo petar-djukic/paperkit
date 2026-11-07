@@ -24,9 +24,6 @@ func TestLoadConfigAppliesDefaults(t *testing.T) {
 		{"BuildDir", config.BuildDir, "build"},
 		{"Output", config.Output, "paper.pdf"},
 		{"Preamble", config.Preamble, filepath.Join("templates", "ieee-preamble.tex")},
-		// A paper that names no engine converts through md-to-tex, the only
-		// engine since the pandoc path was removed (GH-588).
-		{"Engine", config.Engine, EngineLibrary},
 	} {
 		if field.got != field.want {
 			t.Errorf("%s = %q, want %q", field.name, field.got, field.want)
@@ -96,15 +93,13 @@ func TestLoadConfigRejectsEmptyAndDuplicateChapters(t *testing.T) {
 	}
 }
 
-func TestLoadConfigRejectsUnknownEngine(t *testing.T) {
-	root := paperFixture(t, "engine: latexml\nchapters:\n  - 01-intro.md\n", "01-intro.md")
+// paper.yaml decoding is not strict, so a key paperkit no longer reads, such
+// as the removed engine selector, does not break a paper that still sets it.
+func TestLoadConfigIgnoresRetiredKeys(t *testing.T) {
+	root := paperFixture(t, "engine: md-to-tex\nchapters:\n  - 01-intro.md\n", "01-intro.md")
 
-	_, err := LoadConfig(root)
-	if err == nil {
-		t.Fatal("LoadConfig() accepted an engine nothing implements")
-	}
-	if !strings.Contains(err.Error(), "latexml") {
-		t.Errorf("error does not name the engine: %v", err)
+	if _, err := LoadConfig(root); err != nil {
+		t.Errorf("LoadConfig() rejected a retired key: %v", err)
 	}
 }
 
@@ -199,14 +194,5 @@ func writeFile(t *testing.T, root, name, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestLoadConfigRejectsTheRemovedPandocEngine(t *testing.T) {
-	root := paperFixture(t, "engine: pandoc\nchapters:\n  - 01-intro.md\n", "01-intro.md")
-
-	_, err := LoadConfig(root)
-	if err == nil || !strings.Contains(err.Error(), "only engine") {
-		t.Errorf("engine: pandoc error = %v, want a rejection naming the only engine", err)
 	}
 }

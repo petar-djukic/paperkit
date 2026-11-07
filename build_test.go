@@ -162,25 +162,23 @@ func TestFiguresIsANoOpWithoutSources(t *testing.T) {
 	}
 }
 
-func TestCleanRemovesArtifactsButKeepsTexSources(t *testing.T) {
+func TestCleanRemovesGeneratedOutputAndKeepsSources(t *testing.T) {
 	root, config := buildFixture(t)
 	writeFile(t, root, "build/main.aux", "aux")
 	writeFile(t, root, filepath.Join("fig", "chart.pdf"), "%PDF")
 	writeFile(t, root, filepath.Join("fig", "chart.d2"), "a -> b")
-	writeFile(t, root, "tex/01-chapter.tex", "hand-edited")
-	writeFile(t, root, "tex/.baseline/01-chapter.tex", "baseline")
+	writeFile(t, root, "tex/01-chapter.tex", "generated")
 
 	if err := Clean(root, config); err != nil {
 		t.Fatalf("Clean() error: %v", err)
 	}
-	for _, gone := range []string{"build", filepath.Join("fig", "chart.pdf")} {
+	for _, gone := range []string{"build", "tex", filepath.Join("fig", "chart.pdf")} {
 		if _, err := os.Stat(filepath.Join(root, gone)); err == nil {
 			t.Errorf("%s survived Clean()", gone)
 		}
 	}
-	// tex/ holds sources and their baselines, not artifacts.
-	for _, kept := range []string{"tex/01-chapter.tex", "tex/.baseline/01-chapter.tex", filepath.Join("fig", "chart.d2")} {
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(kept))); err != nil {
+	for _, kept := range []string{"01-chapter.md", filepath.Join("fig", "chart.d2")} {
+		if _, err := os.Stat(filepath.Join(root, kept)); err != nil {
 			t.Errorf("Clean() removed %s", kept)
 		}
 	}

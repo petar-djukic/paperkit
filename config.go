@@ -1,14 +1,12 @@
-// Package paperkit builds a paper directory: markdown chapters are the source
-// of truth, LaTeX under tex/ is a hand-editable intermediate, and latexmk
-// produces the PDF. Every paper drives the same targets through a thin
-// magefile plus a paper.yaml, and a paper directory carries everything its
-// build reads, so a copy of it builds anywhere this module is fetchable.
+// Package paperkit builds a paper directory: markdown chapters are the only
+// source, LaTeX under tex/ is generated build output, and latexmk produces the
+// PDF. Every paper drives the same targets through a thin magefile plus a
+// paper.yaml, and a paper directory carries everything its build reads, so a
+// copy of it builds anywhere this module is fetchable.
 //
-// The forward path converts through github.com/petar-djukic/md-to-tex and
-// assembles the fragments into a container document. It is the only engine:
-// the pandoc path it replaced was removed once every paper had converted
-// (GH-588). The backport direction still shells out to pandoc, reading LaTeX
-// back into markdown, which md-to-tex does not do.
+// Conversion goes through github.com/petar-djukic/md-to-tex, and the fragments
+// are assembled into a container document. pandoc is still needed by
+// cmd/refs2bib, which converts the reference corpus to BibTeX.
 //
 // A paper loads natbib in its own preamble. The container names the preamble
 // and never generates its contents, so nothing else brings it in, and without
@@ -53,8 +51,7 @@ type Config struct {
 	// FigureDir holds the d2 sources and their compiled PDFs.
 	FigureDir string `yaml:"figure_dir"`
 
-	// TexDir holds the generated, hand-editable LaTeX and its baseline
-	// snapshots.
+	// TexDir holds the generated LaTeX. It is build output; Clean removes it.
 	TexDir string `yaml:"tex_dir"`
 
 	// BuildDir holds latexmk's working files and the finished PDF.
@@ -78,16 +75,7 @@ type Config struct {
 	// provides (the default) or a filesystem path relative to the paper
 	// directory, either way handed to go run.
 	RefsTool string `yaml:"refs_tool"`
-
-	// Engine names what converts markdown to LaTeX on the forward path.
-	// md-to-tex is the only engine; the field stays so a future engine can be
-	// named, and so a paper may state its engine explicitly.
-	Engine string `yaml:"engine"`
 }
-
-// EngineLibrary converts through md-to-tex. It is the only engine: the pandoc
-// path it replaced was removed once every paper had converted (GH-588).
-const EngineLibrary = "md-to-tex"
 
 // LoadConfig reads paper.yaml from root and applies defaults. A config naming
 // a chapter that is not on disk is an error: a paper that silently drops a
@@ -138,15 +126,9 @@ func (c *Config) applyDefaults() {
 	if c.RefsTool == "" {
 		c.RefsTool = "github.com/petar-djukic/paperkit/cmd/refs2bib"
 	}
-	if c.Engine == "" {
-		c.Engine = EngineLibrary
-	}
 }
 
 func (c Config) validate(root string) error {
-	if c.Engine != EngineLibrary {
-		return fmt.Errorf("engine %q: %s is the only engine (the pandoc path was removed, GH-588)", c.Engine, EngineLibrary)
-	}
 	if len(c.Chapters) == 0 {
 		return fmt.Errorf("paper config lists no chapters")
 	}
