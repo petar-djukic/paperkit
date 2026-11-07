@@ -1,0 +1,42 @@
+package mdtotex
+
+import (
+	"github.com/petar-djukic/paperkit/mdtotex/internal/cite"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/render"
+)
+
+// Options is what a caller configures for a conversion.
+//
+// It is a plain value holding no file paths to read and no callbacks: the
+// caller may keep it in its own configuration file, and this library reads
+// none (srd002-renderer-core R2.1). The zero value converts a chapter that
+// carries no citations (R2.3).
+type Options struct {
+	// CitationKeys is the set of keys a citation may name, which the caller
+	// takes from its reference corpus.
+	//
+	// A nil slice turns key validation off. A non-nil empty slice holds no
+	// valid key, so every citation fails against it. The two are
+	// distinguishable, which is what srd006-citations R3.2 requires.
+	CitationKeys []string
+
+	// TableFontSize is the size command a table float carries. A nil value
+	// takes the default one step below the body; a pointer to an empty string
+	// emits none, which is how a caller asks for body-size tables
+	// (srd005-tables R2.7).
+	TableFontSize *string
+}
+
+// renderConfig is what the chapter path needs from the caller's options.
+func (o Options) renderConfig() render.Config {
+	return render.Config{Citations: o.citations(), TableSize: o.TableFontSize}
+}
+
+// citations converts the caller's keys into the set the renderer validates
+// against, preserving the difference between absent and empty.
+func (o Options) citations() cite.KeySet {
+	if o.CitationKeys == nil {
+		return nil
+	}
+	return cite.NewKeySet(o.CitationKeys...)
+}

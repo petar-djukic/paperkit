@@ -8,8 +8,8 @@
 // pointing at paper goal G<n>), and its content (the objective as a lead-in,
 // then the topics it will cover), tables and figures with descriptions, how
 // it contributes (links.supports), and its references via \cite.
-// The md format emits the same content as a markdown chapter for the md-to-tex
-// pipeline instead.
+// The md format emits the same content as a markdown chapter for the mdtotex
+// converter instead.
 package srd
 
 import (
@@ -144,13 +144,13 @@ func loadFrontMatter(path string) (map[string]interface{}, error) {
 }
 
 // emitMarkdown renders the outline as a markdown chapter: plain text a
-// human reads in any editor (or Obsidian), and a valid md-to-tex source the
+// human reads in any editor (or Obsidian), and a valid mdtotex source the
 // paper's magefile compiles through the same pipeline as the chapters. The
 // title and abstract stay in 00-title-page.md — the outline is a chapter,
 // so the paper's own front matter renders the title page. Citations are
 // pandoc-style [@id] and resolve against the paper's bibliography; planned
 // tables and figures render as italic notes, and a table with drafted rows
-// renders as a pipe table with the caption line md-to-tex requires.
+// renders as a pipe table with the caption line mdtotex requires.
 func emitMarkdown(vis map[string]interface{}, units []string, srds map[string]map[string]interface{}) []byte {
 	var out []string
 	w := func(lines ...string) { out = append(out, lines...) }
@@ -306,7 +306,7 @@ type Format string
 const (
 	// TeX is a standalone IEEEtran document.
 	TeX Format = "tex"
-	// Markdown is a chapter for the md-to-tex pipeline.
+	// Markdown is a chapter for the mdtotex converter.
 	Markdown Format = "md"
 )
 

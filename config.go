@@ -4,7 +4,7 @@
 // paper.yaml, and a paper directory carries everything its build reads, so a
 // copy of it builds anywhere this module is fetchable.
 //
-// Conversion goes through github.com/petar-djukic/md-to-tex, and the fragments
+// Conversion goes through the mdtotex package, and the fragments
 // are assembled into a container document. pandoc is still needed by
 // cmd/refs2bib, which converts the reference corpus to BibTeX.
 //
