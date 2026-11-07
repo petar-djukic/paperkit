@@ -58,7 +58,7 @@ func outlineTeX(root string, config Config) error {
 		return err
 	}
 	fmt.Printf("outline: latexmk -xelatex -> %s\n", filepath.Join(config.BuildDir, "outline.pdf"))
-	return latexmk(texDir, filepath.Join(root, config.BuildDir), "outline.tex", "outline.pdf", absoluteRoot+"//:")
+	return latexmk(texDir, filepath.Join(root, config.BuildDir), "outline.tex", "outline", "outline.pdf", absoluteRoot+"//:")
 }
 
 // outlineMarkdown writes outline.md and compiles it as a one-chapter paper
@@ -101,7 +101,7 @@ func outlineMarkdown(root string, config Config) error {
 	}
 	fmt.Printf("outline: latexmk -xelatex -> %s\n", filepath.Join(outline.BuildDir, outline.Output))
 	return latexmk(filepath.Join(root, outline.TexDir), filepath.Join(root, outline.BuildDir),
-		"main.tex", outline.Output, texinputs)
+		"main.tex", "outline", outline.Output, texinputs)
 }
 
 // dropEmptyBibliography removes the bibliography block from an outline that
