@@ -1,14 +1,12 @@
-// Package paperkit builds a paper directory: markdown chapters are the source
-// of truth, LaTeX under tex/ is a hand-editable intermediate, and latexmk
-// produces the PDF. Every paper drives the same targets through a thin
-// magefile plus a paper.yaml, and a paper directory carries everything its
-// build reads, so a copy of it builds anywhere this module is fetchable.
+// Package paperkit builds a paper directory: markdown chapters are the only
+// source, LaTeX under tex/ is generated build output, and latexmk produces the
+// PDF. Every paper drives the same targets through a thin magefile plus a
+// paper.yaml, and a paper directory carries everything its build reads, so a
+// copy of it builds anywhere this module is fetchable.
 //
-// The forward path converts through github.com/petar-djukic/md-to-tex and
-// assembles the fragments into a container document. It is the only engine:
-// the pandoc path it replaced was removed once every paper had converted
-// (GH-588). The backport direction still shells out to pandoc, reading LaTeX
-// back into markdown, which md-to-tex does not do.
+// Conversion goes through github.com/petar-djukic/md-to-tex, and the fragments
+// are assembled into a container document. pandoc is still needed by
+// cmd/refs2bib, which converts the reference corpus to BibTeX.
 //
 // A paper loads natbib in its own preamble. The container names the preamble
 // and never generates its contents, so nothing else brings it in, and without
@@ -53,8 +51,7 @@ type Config struct {
 	// FigureDir holds the d2 sources and their compiled PDFs.
 	FigureDir string `yaml:"figure_dir"`
 
-	// TexDir holds the generated, hand-editable LaTeX and its baseline
-	// snapshots.
+	// TexDir holds the generated LaTeX. It is build output; Clean removes it.
 	TexDir string `yaml:"tex_dir"`
 
 	// BuildDir holds latexmk's working files and the finished PDF.

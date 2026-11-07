@@ -11,10 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ErrCollisions reports identifiers that more than one chapter claims. It is
-// separate from ErrConflicts because the author resolves it differently: a
-// conflict is a merge to settle in the LaTeX, a collision is a heading to name
-// in the markdown.
+// ErrCollisions reports identifiers that more than one chapter claims. The
+// author resolves it in the markdown, by naming one of the headings.
 var ErrCollisions = errors.New("chapters claim the same label")
 
 // convertRoster renders every markdown source the container will input, and

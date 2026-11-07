@@ -47,7 +47,7 @@ func TestGenerateTexLibraryEngineConvertsWithoutPandoc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := GenerateTex(root, config); err != nil {
+	if err := GenerateTex(root, config); err != nil {
 		t.Fatalf("GenerateTex() error: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestGenerateTexLibraryContainerInputsRosterInOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := GenerateTex(root, config); err != nil {
+	if err := GenerateTex(root, config); err != nil {
 		t.Fatalf("GenerateTex() error: %v", err)
 	}
 
@@ -123,7 +123,7 @@ func TestGenerateTexLibraryReportsLabelCollisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = GenerateTex(root, config)
+	err = GenerateTex(root, config)
 	if !errors.Is(err, ErrCollisions) {
 		t.Fatalf("GenerateTex() error = %v, want ErrCollisions", err)
 	}
@@ -152,7 +152,7 @@ func TestGenerateTexLibraryNeverPrefixesLabels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := GenerateTex(root, config); err != nil {
+	if err := GenerateTex(root, config); err != nil {
 		t.Fatalf("GenerateTex() error: %v", err)
 	}
 
@@ -174,7 +174,7 @@ func TestGenerateTexLibraryRejectsUnknownCitationKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = GenerateTex(root, config)
+	err = GenerateTex(root, config)
 	if err == nil {
 		t.Fatal("GenerateTex() accepted a citation the corpus does not define")
 	}

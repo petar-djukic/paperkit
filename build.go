@@ -145,10 +145,8 @@ var (
 // figure referenced but never compiled, LaTeX older than the markdown it came
 // from, or a compile that succeeds while the log records undefined citations.
 //
-// Staleness is reported rather than repaired. Tex older than its markdown means
-// there are unmerged prose changes upstream, and quietly regenerating them
-// underneath the author would merge into their hand edits as a side effect of
-// asking a question.
+// Staleness is reported rather than repaired, so asking the question never
+// changes the build: the tex target regenerates.
 func Audit(root string, config Config) error {
 	if err := Figures(root, config); err != nil {
 		return err
@@ -208,12 +206,14 @@ func checkSources(root string, config Config) ([]string, error) {
 	return problems, nil
 }
 
-// Clean removes the build directory and every generated figure PDF, leaving
-// tex/ alone: it holds the author's hand edits and their baselines, which are
-// sources, not artifacts.
+// Clean removes everything the build generates: the build directory, the tex
+// directory, and every compiled figure PDF. Removing tex/ also drops fragments
+// left behind by a chapter that was renamed or taken off the roster.
 func Clean(root string, config Config) error {
-	if err := os.RemoveAll(filepath.Join(root, config.BuildDir)); err != nil {
-		return err
+	for _, dir := range []string{config.BuildDir, config.TexDir} {
+		if err := os.RemoveAll(filepath.Join(root, dir)); err != nil {
+			return err
+		}
 	}
 	pdfs, err := filepath.Glob(filepath.Join(root, config.FigureDir, "*.pdf"))
 	if err != nil {
