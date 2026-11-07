@@ -3,8 +3,8 @@ package mdtotex
 import (
 	"strings"
 
-	"github.com/petar-djukic/md-to-tex/internal/frontmatter"
-	"github.com/petar-djukic/md-to-tex/internal/render"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/frontmatter"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/render"
 )
 
 // RenderFrontMatter renders a paper's title page as the front-matter fragment

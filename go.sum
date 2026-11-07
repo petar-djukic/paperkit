@@ -1,7 +1,3 @@
-github.com/magefile/mage v1.17.2 h1:fyXVu1eadI8Ap1HCCNgEhJ5McIWiYhLR8uol64ZZc40=
-github.com/magefile/mage v1.17.2/go.mod h1:Yj51kqllmsgFpvvSzgrZPK9WtluG3kUhFaBUVLo4feA=
-github.com/petar-djukic/md-to-tex v0.20260821.2 h1:UyA6vrbMAgRRXVjfXWprr3fjuGtqafCEOr/zOO8XBnQ=
-github.com/petar-djukic/md-to-tex v0.20260821.2/go.mod h1:5hHOMrABqDzd0toxQhX3awYDcijuAqfWfOCkDGG6Pfo=
 github.com/yuin/goldmark v1.8.5 h1:r6N5afV5qj/5S4UTch8agZHJ8UxNCMwX7WjkkJam2NA=
 github.com/yuin/goldmark v1.8.5/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
 golang.org/x/text v0.41.0 h1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=

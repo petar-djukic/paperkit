@@ -5,7 +5,7 @@ import (
 
 	"github.com/yuin/goldmark/ast"
 
-	"github.com/petar-djukic/md-to-tex/internal/latex"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/latex"
 )
 
 // writeText writes a run of markdown text, escaping the prose and passing the

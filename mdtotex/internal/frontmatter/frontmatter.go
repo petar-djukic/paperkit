@@ -17,7 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/petar-djukic/md-to-tex/internal/latex"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/latex"
 )
 
 // Page is what a title page carries: metadata in its YAML frontmatter, and an

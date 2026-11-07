@@ -1,7 +1,7 @@
 package mdtotex
 
 import (
-	"github.com/petar-djukic/md-to-tex/internal/render"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/render"
 )
 
 // Result is what one chapter conversion produces.

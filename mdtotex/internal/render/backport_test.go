@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/petar-djukic/md-to-tex/internal/latex"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/latex"
 )
 
 // floatFixtures are the float-carrying chapters this package converts: the

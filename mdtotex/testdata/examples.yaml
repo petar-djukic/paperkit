@@ -1,0 +1,253 @@
+# Worked examples from md-to-tex's requirement documents (docs/specs at
+# 2d29bf0, archived with the md-to-tex repository). Each pair is converted
+# byte for byte by examples_test.go.
+- srd: srd001-front-matter
+  group: R2
+  markdown: |
+    ---
+    title: Converting Markdown to IEEEtran
+    subtitle: A Library for Paper Pipelines
+    author: Petar Djukic
+    ---
+  latex: |
+    \title{Converting Markdown to IEEEtran\\ \large A Library for Paper Pipelines}
+    \author{Petar Djukic}
+    \maketitle
+- srd: srd001-front-matter
+  group: R3
+  markdown: |
+    ---
+    title: A Paper
+    author: Petar Djukic [petar.djukic@example.com](mailto:petar.djukic@example.com)
+    ---
+  latex: |
+    \title{A Paper}
+    \author{Petar Djukic\\ \texttt{petar.djukic@example.com}}
+    \maketitle
+- srd: srd001-front-matter
+  group: R4
+  markdown: |
+    ---
+    title: Autogenic Systems
+    author: Petar Djukic
+    abstract: |
+      Advances in code-generating AI are moving software toward
+      systems that evolve themselves.
+    ---
+
+    ```{=latex}
+    \begin{IEEEkeywords}
+    Autogenic systems, LLM agents.
+    \end{IEEEkeywords}
+    ```
+  latex: |
+    \title{Autogenic Systems}
+    \author{Petar Djukic}
+    \maketitle
+    \begin{abstract}
+    Advances in code-generating AI are moving software toward
+    systems that evolve themselves.
+    \end{abstract}
+    \begin{IEEEkeywords}
+    Autogenic systems, LLM agents.
+    \end{IEEEkeywords}
+- srd: srd002-renderer-core
+  group: R3
+  markdown: |
+    # The Conversion Pipeline {#sec:pipeline}
+
+    ## Escaping
+  latex: |
+    \section{The Conversion Pipeline}\label{sec:pipeline}
+
+    \subsection{Escaping}\label{escaping}
+  note: |
+    The first heading states an identifier and keeps it; the second
+    states none and takes the slug derived under R3.5, which is what the
+    manuscripts' existing references were written against.
+- srd: srd002-renderer-core
+  group: R4
+  markdown: |
+    The *escaper* handles the ten `special` characters.
+  latex: |
+    The \emph{escaper} handles the ten \texttt{special} characters.
+- srd: srd002-renderer-core
+  group: R5
+  markdown: |
+    - forward conversion
+    - backport
+  latex: |
+    \begin{itemize}
+    \item forward conversion
+    \item backport
+    \end{itemize}
+- srd: srd003-escaping
+  group: R1
+  markdown: |
+    100% of the R&D budget, item_one, and $x$ in {braces}
+  latex: |
+    100\% of the R\&D budget, item\_one, and \$x\$ in \{braces\}
+- srd: srd003-escaping
+  group: R1
+  markdown: |
+    A backslash \ and a tilde ~ and a caret ^
+  latex: |
+    A backslash \textbackslash{} and a tilde \textasciitilde{} and a caret \textasciicircum{}
+- srd: srd003-escaping
+  group: R2
+  markdown: |
+    Bianchi's model of 802.11 uses lambda and mu -- see Figure 1.
+  latex: |
+    Bianchi's model of 802.11 uses lambda and mu -- see Figure 1.
+- srd: srd004-figures
+  group: R2
+  markdown: |
+    ![Autonomy levels graded by who writes the specification.](fig/01-kinds-to-levels.pdf){#fig:kinds-to-levels}
+  latex: |
+    \begin{figure}[!t]
+    \centering
+    \includegraphics[width=\columnwidth]{01-kinds-to-levels}
+    \caption{Autonomy levels graded by who writes the specification.}
+    \label{fig:kinds-to-levels}
+    \end{figure}
+- srd: srd004-figures
+  group: R3
+  markdown: |
+    ![The closed loop runs the algorithm its specification records.](fig/00-concept-structure.pdf){#fig:concept-structure .wide}
+  latex: |
+    \begin{figure*}[!t]
+    \centering
+    \includegraphics[width=\textwidth]{00-concept-structure}
+    \caption{The closed loop runs the algorithm its specification records.}
+    \label{fig:concept-structure}
+    \end{figure*}
+- srd: srd004-figures
+  group: R3
+  markdown: |
+    ![A narrow diagram.](fig/02-narrow.pdf){#fig:narrow width=0.6}
+  latex: |
+    \begin{figure}[!t]
+    \centering
+    \includegraphics[width=0.6\columnwidth]{02-narrow}
+    \caption{A narrow diagram.}
+    \label{fig:narrow}
+    \end{figure}
+- srd: srd005-tables
+  group: R2
+  markdown: |
+    | Survey | Scope | What this article adds |
+    |--------|-------|------------------------|
+    | Coronado et al., 2022 [@coronado-2022-ztn-survey] | Zero-touch automation for 5G/6G | Grades by who supplies the software |
+    | This article | Agentic AI across the autonomy levels | One frame: maturity, intent loop, governance |
+
+    Table: Adjacent surveys and what this article adds over each. {#tab:adjacent-surveys}
+  latex: |
+    \begin{table}[!t]
+    \caption{Adjacent surveys and what this article adds over each.}
+    \label{tab:adjacent-surveys}
+    \centering
+    \footnotesize
+    \begin{tabularx}{\columnwidth}{>{\hsize=1.216\hsize\raggedright\arraybackslash}X >{\hsize=0.858\hsize\raggedright\arraybackslash}X >{\hsize=0.925\hsize\raggedright\arraybackslash}X}
+    \toprule
+    Survey & Scope & What this article adds \\
+    \midrule
+    Coronado et al., 2022 \cite{coronado-2022-ztn-survey} & Zero-touch automation for 5G/6G & Grades by who supplies the software \\
+    This article & Agentic AI across the autonomy levels & One frame: maturity, intent loop, governance \\
+    \bottomrule
+    \end{tabularx}
+    \end{table}
+  note: |
+    Three columns, longest cell 53 characters, estimated height 6 lines,
+    so R4 selects the unstarred float and the column measure. The first
+    column carries the largest weight because the citation key is an
+    unbreakable 24-character word and R3.4 floors the column at the width
+    that word needs.
+- srd: srd005-tables
+  group: R4
+  markdown: |
+    | Level | Who writes it | Approval | Coverage | Example |
+    |-------|---------------|----------|----------|---------|
+    | L3 | Guided agent | Per change | Selected | Fault management |
+    | L4 | Guided agent | Pre-approved | Wide | Change management |
+
+    Table: Autonomy levels by authorship and approval. {#tab:levels}
+  latex: |
+    \begin{table*}[!t]
+    \caption{Autonomy levels by authorship and approval.}
+    \label{tab:levels}
+    \centering
+    \footnotesize
+    \begin{tabularx}{\textwidth}{>{\hsize=0.456\hsize\raggedright\arraybackslash}X >{\hsize=1.116\hsize\raggedright\arraybackslash}X >{\hsize=1.272\hsize\raggedright\arraybackslash}X >{\hsize=0.848\hsize\raggedright\arraybackslash}X >{\hsize=1.309\hsize\raggedright\arraybackslash}X}
+    \toprule
+    Level & Who writes it & Approval & Coverage & Example \\
+    \midrule
+    L3 & Guided agent & Per change & Selected & Fault management \\
+    L4 & Guided agent & Pre-approved & Wide & Change management \\
+    \bottomrule
+    \end{tabularx}
+    \end{table*}
+  note: |
+    Five columns, so R4.1 selects the starred float on the column count
+    alone, before either width test is reached.
+- srd: srd006-citations
+  group: R2
+  markdown: |
+    Zero-touch automation is surveyed in [@coronado-2022-ztn-survey].
+  latex: |
+    Zero-touch automation is surveyed in \cite{coronado-2022-ztn-survey}.
+- srd: srd006-citations
+  group: R2
+  markdown: |
+    Both lines converge [@declarative-agents-2026; @zhang-2025b].
+  latex: |
+    Both lines converge \cite{declarative-agents-2026,zhang-2025b}.
+- srd: srd007-passthrough
+  group: R1
+  markdown: |
+    ```{=latex}
+    \begin{IEEEkeywords}
+    Autogenic systems, LLM agents.
+    \end{IEEEkeywords}
+    ```
+  latex: |
+    \begin{IEEEkeywords}
+    Autogenic systems, LLM agents.
+    \end{IEEEkeywords}
+- srd: srd007-passthrough
+  group: R2
+  markdown: |
+    Section \ref{literature-survey} surveys the standards, and Figure \ref{fig:kinds-to-levels} grades them.
+  latex: |
+    Section \ref{literature-survey} surveys the standards, and Figure \ref{fig:kinds-to-levels} grades them.
+- srd: srd008-container
+  group: R1
+  markdown: |
+    roster:
+      - 00-front-matter.md
+      - 01-introduction.md
+      - 02-literature-survey.md
+  latex: |
+    \documentclass[conference]{IEEEtran}
+    \input{preamble}
+    \bibliographystyle{IEEEtranN}
+    \graphicspath{{../}{../fig/}}
+    \begin{document}
+    \input{00-front-matter}
+    \input{01-introduction}
+    \input{02-literature-survey}
+    \bibliography{references}
+    \end{document}
+  note: |
+    The roster is the caller's chapter list, shown here as the data it
+    passes rather than as a file the library reads.
+- srd: srd009-backport-compatibility
+  group: R2
+  markdown: |
+    The permitted form, as srd004-figures R2.1 emits it.
+  latex: |
+    \begin{figure}[!t]
+    \centering
+    \includegraphics[width=\columnwidth]{01-kinds-to-levels.pdf}
+    \caption{Autonomy levels graded by who writes the specification.}
+    \label{fig:kinds-to-levels}
+    \end{figure}

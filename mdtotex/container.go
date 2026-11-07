@@ -1,6 +1,6 @@
 package mdtotex
 
-import "github.com/petar-djukic/md-to-tex/internal/container"
+import "github.com/petar-djukic/paperkit/mdtotex/internal/container"
 
 // ContainerOptions is what the container document needs from the caller: the
 // class and its options, the preamble file it includes by name, the

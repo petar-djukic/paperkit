@@ -7,8 +7,8 @@ import (
 
 	"github.com/yuin/goldmark/ast"
 
-	"github.com/petar-djukic/md-to-tex/internal/cite"
-	"github.com/petar-djukic/md-to-tex/internal/latex"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/cite"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/latex"
 )
 
 // inlines renders the inline children of a block node into the output buffer.

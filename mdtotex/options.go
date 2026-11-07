@@ -1,8 +1,8 @@
 package mdtotex
 
 import (
-	"github.com/petar-djukic/md-to-tex/internal/cite"
-	"github.com/petar-djukic/md-to-tex/internal/render"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/cite"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/render"
 )
 
 // Options is what a caller configures for a conversion.

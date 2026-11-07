@@ -17,7 +17,7 @@ import (
 
 func main() {
 	docs := flag.String("docs", "docs", "paper docs directory holding VISION.yaml and srd/")
-	format := flag.String("format", "tex", "output format: tex (a standalone IEEEtran document) or md (a markdown chapter for the md-to-tex pipeline)")
+	format := flag.String("format", "tex", "output format: tex (a standalone IEEEtran document) or md (a markdown chapter for the mdtotex converter)")
 	flag.Parse()
 
 	outline, err := srd.Render(*docs, srd.Format(*format))

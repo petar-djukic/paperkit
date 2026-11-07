@@ -6,7 +6,7 @@ Papers rot when their build lives somewhere else: a manuscript copied between re
 
 ```mermaid
 flowchart LR
-    MD[chapters *.md] -->|md-to-tex| TEX[tex/ fragments + main.tex]
+    MD[chapters *.md] -->|mdtotex| TEX[tex/ fragments + main.tex]
     TEX -->|latexmk, xelatex| PDF[build/paper.pdf]
     REFS[references.yaml] -->|bib| BIB[tex/references.bib]
     D2[figure sources *.d2] -->|d2| FIGS[figure PDFs, diagram PNGs]
@@ -57,7 +57,7 @@ var Default = papermage.PDF
 
 ## Methodology
 
-Conversion goes through [md-to-tex](https://github.com/petar-djukic/md-to-tex), which is a pure function; paperkit owns everything around it. `GenerateTex` converts the roster, rejects cross-chapter label collisions before writing anything, and writes each fragment into `tex/`. `PDF` runs latexmk with xelatex and fails the build when the log reports a glyph no font provides, because latexmk exits zero on that and the character silently vanishes from print. `Audit` reports stale LaTeX, missing figures, and undefined citations from an actual compile.
+Conversion goes through the `mdtotex` package, a pure function from markdown bytes to LaTeX; the rest of paperkit owns everything around it. `GenerateTex` converts the roster, rejects cross-chapter label collisions before writing anything, and writes each fragment into `tex/`. `PDF` runs latexmk with xelatex and fails the build when the log reports a glyph no font provides, because latexmk exits zero on that and the character silently vanishes from print. `Audit` reports stale LaTeX, missing figures, and undefined citations from an actual compile.
 
 `Audit` also compares each entry of the paper's `references.yaml` with the entry of the same id in the corpus, and reports the ones that differ without changing either. Either side may be the better record, since a paper's copy is often the one curated for print, so reconciling them is the author's decision.
 
@@ -73,7 +73,7 @@ from a paper directory whose `go.mod` requires this module. Requires d2, latexmk
 
 ## History
 
-Extracted from [autogenic-systems](https://github.com/petar-djukic/autogenic-systems), where eight papers build with it; the commit history of the extraction is preserved. The pandoc conversion path this library once carried was removed before extraction; md-to-tex does all conversion.
+Extracted from [autogenic-systems](https://github.com/petar-djukic/autogenic-systems), where eight papers build with it; the commit history of the extraction is preserved. The pandoc conversion path this library once carried was removed before extraction. The converter, developed as the separate [md-to-tex](https://github.com/petar-djukic/md-to-tex) repository, was folded in as `mdtotex/` with its history (subtree merge at 2d29bf0); that repository is archived, and its HTTP service and requirement documents stay there.
 
 ## License
 

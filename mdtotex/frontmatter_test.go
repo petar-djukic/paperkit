@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	mdtotex "github.com/petar-djukic/md-to-tex"
+	"github.com/petar-djukic/paperkit/mdtotex"
 )
 
 // TestRenderFrontMatterRendersTheSRDExample covers srd001-front-matter R4.1,

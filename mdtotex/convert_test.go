@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	mdtotex "github.com/petar-djukic/md-to-tex"
+	"github.com/petar-djukic/paperkit/mdtotex"
 )
 
 // TestConvertRendersAChapter covers srd002-renderer-core R1.1 and R1.4 across

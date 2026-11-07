@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	mdtotex "github.com/petar-djukic/md-to-tex"
+	"github.com/petar-djukic/paperkit/mdtotex"
 )
 
 // update rewrites the committed expectations instead of comparing against

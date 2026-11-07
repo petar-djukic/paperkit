@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/petar-djukic/md-to-tex/internal/cite"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/cite"
 )
 
 func convert(t *testing.T, source string) string {

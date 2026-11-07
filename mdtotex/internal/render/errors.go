@@ -3,7 +3,7 @@ package render
 import (
 	"errors"
 
-	"github.com/petar-djukic/md-to-tex/internal/cite"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/cite"
 )
 
 // asUnknownKey unwraps an unknown-citation-key error, which carries the

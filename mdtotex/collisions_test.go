@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	mdtotex "github.com/petar-djukic/md-to-tex"
+	"github.com/petar-djukic/paperkit/mdtotex"
 )
 
 func convertChapter(t *testing.T, name, source string) mdtotex.Result {

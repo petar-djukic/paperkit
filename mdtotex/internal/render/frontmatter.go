@@ -3,7 +3,7 @@ package render
 import (
 	"bytes"
 
-	"github.com/petar-djukic/md-to-tex/internal/frontmatter"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/frontmatter"
 )
 
 // dropFrontMatter removes a leading YAML frontmatter block from a chapter,

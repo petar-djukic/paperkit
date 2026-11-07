@@ -20,7 +20,7 @@ import (
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
 
-	"github.com/petar-djukic/md-to-tex/internal/cite"
+	"github.com/petar-djukic/paperkit/mdtotex/internal/cite"
 )
 
 // Config is what the walk needs from the caller's options
@@ -324,7 +324,7 @@ func (w *walker) heading(node *ast.Heading) error {
 // derived from the heading text (srd002-renderer-core R3.4, R3.5).
 // HeadingIdentifier is the identifier a heading carries: the stated {#id}
 // attribute, or the slug derived from its text. The parse walk reports it so
-// a service caller sees the identifier the fragment labels the heading with.
+// a caller sees the identifier the fragment labels the heading with.
 func HeadingIdentifier(node *ast.Heading, heading string) (string, bool) {
 	return headingIdentifier(node, heading)
 }

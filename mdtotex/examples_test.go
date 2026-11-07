@@ -8,55 +8,35 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	mdtotex "github.com/petar-djukic/md-to-tex"
+	"github.com/petar-djukic/paperkit/mdtotex"
 )
 
-// example is one markdown and LaTeX pair an SRD states, with the requirement
-// group it belongs to.
+// example is one markdown and LaTeX pair a requirement document states, with
+// the requirement group it belongs to.
 type example struct {
-	SRD      string
-	Group    string
+	SRD      string `yaml:"srd"`
+	Group    string `yaml:"group"`
 	Markdown string `yaml:"markdown"`
 	LaTeX    string `yaml:"latex"`
 	Note     string `yaml:"note"`
 }
 
-// srdExamples reads every worked example in the corpus.
-//
-// The examples are read rather than copied, so a fixture and the specification
-// it came from cannot drift apart: changing an SRD example changes what this
-// test converts and what it expects, in the same edit.
+// srdExamples reads the worked examples md-to-tex's requirement documents
+// stated. Those documents stayed with the archived md-to-tex repository; the
+// pairs they carried live in testdata/examples.yaml, so the converter is still
+// held to them byte for byte.
 func srdExamples(t *testing.T) []example {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join("docs", "specs", "software-requirements", "srd*.yaml"))
+	data, err := os.ReadFile(filepath.Join("testdata", "examples.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) == 0 {
-		t.Fatal("the corpus holds no requirement documents")
-	}
-
 	var found []example
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var document struct {
-			ID           string `yaml:"id"`
-			Requirements map[string]struct {
-				Examples []example `yaml:"examples"`
-			} `yaml:"requirements"`
-		}
-		if err := yaml.Unmarshal(data, &document); err != nil {
-			t.Fatalf("%s: %v", path, err)
-		}
-		for group, requirements := range document.Requirements {
-			for _, stated := range requirements.Examples {
-				stated.SRD, stated.Group = document.ID, group
-				found = append(found, stated)
-			}
-		}
+	if err := yaml.Unmarshal(data, &found); err != nil {
+		t.Fatal(err)
+	}
+	if len(found) == 0 {
+		t.Fatal("testdata/examples.yaml holds no examples")
 	}
 	return found
 }
@@ -70,10 +50,7 @@ func chapterExamples(t *testing.T) []example {
 		switch {
 		case stated.SRD == "srd001-front-matter",
 			stated.SRD == "srd008-container",
-			stated.SRD == "srd009-backport-compatibility",
-			// The service example states an HTTP request and its JSON answer,
-			// which the service tests exercise.
-			stated.SRD == "srd010-service":
+			stated.SRD == "srd009-backport-compatibility":
 			continue
 		case strings.HasPrefix(strings.TrimSpace(stated.Markdown), "---"):
 			continue
@@ -87,11 +64,8 @@ func chapterExamples(t *testing.T) []example {
 // example a requirement document states converts to the LaTeX that document
 // states, byte for byte.
 //
-// This is what rel01.0 validates. The unit tests assert the same pairs, but
-// each states its expectation in Go; here the expectation is read from the
-// specification itself, so an SRD example nobody implemented, or an
-// implementation that drifted from its example, fails without anyone
-// remembering to check.
+// The unit tests assert the same pairs, but each states its expectation in Go;
+// here the expectations are the requirement documents' own examples.
 func TestEverySRDExampleConverts(t *testing.T) {
 	examples := chapterExamples(t)
 	if len(examples) < 8 {

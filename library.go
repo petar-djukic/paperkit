@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mdtotex "github.com/petar-djukic/md-to-tex"
+	"github.com/petar-djukic/paperkit/mdtotex"
 	"gopkg.in/yaml.v3"
 )
 
