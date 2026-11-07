@@ -75,16 +75,7 @@ type Config struct {
 	// provides (the default) or a filesystem path relative to the paper
 	// directory, either way handed to go run.
 	RefsTool string `yaml:"refs_tool"`
-
-	// Engine names what converts markdown to LaTeX on the forward path.
-	// md-to-tex is the only engine; the field stays so a future engine can be
-	// named, and so a paper may state its engine explicitly.
-	Engine string `yaml:"engine"`
 }
-
-// EngineLibrary converts through md-to-tex. It is the only engine: the pandoc
-// path it replaced was removed once every paper had converted (GH-588).
-const EngineLibrary = "md-to-tex"
 
 // LoadConfig reads paper.yaml from root and applies defaults. A config naming
 // a chapter that is not on disk is an error: a paper that silently drops a
@@ -135,15 +126,9 @@ func (c *Config) applyDefaults() {
 	if c.RefsTool == "" {
 		c.RefsTool = "github.com/petar-djukic/paperkit/cmd/refs2bib"
 	}
-	if c.Engine == "" {
-		c.Engine = EngineLibrary
-	}
 }
 
 func (c Config) validate(root string) error {
-	if c.Engine != EngineLibrary {
-		return fmt.Errorf("engine %q: %s is the only engine (the pandoc path was removed, GH-588)", c.Engine, EngineLibrary)
-	}
 	if len(c.Chapters) == 0 {
 		return fmt.Errorf("paper config lists no chapters")
 	}

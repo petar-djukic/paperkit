@@ -40,7 +40,7 @@ from a paper directory whose `go.mod` requires this module. Requires d2, latexmk
 
 ## History
 
-Extracted from [autogenic-systems](https://github.com/petar-djukic/autogenic-systems), where six papers build with it; the commit history of the extraction is preserved. The pandoc conversion engine this library once carried was removed before extraction — md-to-tex is the only engine.
+Extracted from [autogenic-systems](https://github.com/petar-djukic/autogenic-systems), where six papers build with it; the commit history of the extraction is preserved. The pandoc conversion path this library once carried was removed before extraction; md-to-tex does all conversion.
 
 ## License
 

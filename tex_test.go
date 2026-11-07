@@ -6,14 +6,12 @@ import (
 	"testing"
 )
 
-// The conversion itself is covered in library_test.go; this file holds the
-// engine-independent behavior of GenerateTex.
+// The conversion itself is covered in library_test.go; this file holds what
+// GenerateTex does with the converted fragments.
 
 func TestGenerateTexAcceptsRelativeRoot(t *testing.T) {
 	parent := t.TempDir()
 	root := filepath.Join(parent, "paper")
-	// No engine line: a paper that names none converts through md-to-tex,
-	// which is the only engine since the pandoc path was removed (GH-588).
 	writeFile(t, root, "paper.yaml", "bibliography: references.yaml\nchapters:\n  - 01-first.md\n")
 	writeFile(t, root, filepath.Join("templates", "ieee-preamble.tex"), "% preamble\n")
 	writeFile(t, root, "references.yaml", "- id: lee-2026\n  title: A Cited Work\n")

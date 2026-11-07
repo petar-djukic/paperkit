@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// libraryFixture writes a paper that converts through md-to-tex: the engine,
-// a reference corpus inside the paper directory so the test does not reach
-// outside its own root, a title page, and whatever chapters the case needs.
+// libraryFixture writes a paper with a reference corpus inside the paper
+// directory so the test does not reach outside its own root, a title page,
+// and whatever chapters the case needs.
 func libraryFixture(t *testing.T, chapters ...string) string {
 	t.Helper()
-	config := "engine: md-to-tex\nbibliography: references.yaml\ntitle_page: 00-title-page.md\nchapters:\n"
+	config := "bibliography: references.yaml\ntitle_page: 00-title-page.md\nchapters:\n"
 	for _, chapter := range chapters {
 		config += "  - " + chapter + "\n"
 	}
@@ -37,7 +37,7 @@ func poisonPandoc(t *testing.T) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-func TestGenerateTexLibraryEngineConvertsWithoutPandoc(t *testing.T) {
+func TestGenerateTexConvertsWithoutPandoc(t *testing.T) {
 	poisonPandoc(t)
 	root := libraryFixture(t, "01-first.md", "02-second.md")
 	writeFile(t, root, "01-first.md", "# First\n\nProse citing [@lee-2026].\n")
