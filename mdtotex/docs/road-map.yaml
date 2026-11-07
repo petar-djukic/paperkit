@@ -1,0 +1,93 @@
+# Implementation roadmap for md-to-tex (GH-14, GH-26).
+#
+# Two readers share this file. The specification-critic reads the shared corpus
+# fields -- version, name, status, and use_cases -- and the repository's own
+# release-to-SRD edge check reads units, which the shared schema has no place
+# for. The gate is ours as well. Each reader ignores what belongs to the other.
+#
+# Releases order the nine SRDs so each release ships something the consuming
+# pipeline can adopt on its own. The cut follows the dependency edges in the
+# SRDs rather than the adoption order GH-14 first proposed: the title page
+# converts its abstract and body through the chapter path
+# (srd001-front-matter), so the chapter core precedes the front matter.
+#
+# The audit holds this file to the layer: every unit a release names is an
+# SRD on disk, and every SRD is assigned to exactly one release.
+
+meta:
+  artifact: 'md-to-tex: Go library converting Obsidian-native markdown manuscripts to IEEEtran LaTeX'
+  ordering: SRD dependency edges, 2026-08-20
+  gates: 'A release closes when every requirement its SRDs state is named by a passing test and mage audit is green. Closed releases are tagged from main via gh-release-push.'
+
+releases:
+
+  - id: rel00.0
+    version: "00.0"
+    name: Specification layer
+    status: complete
+    units: []
+    gate: 'Completed before implementation opened: VISION, ARCHITECTURE, the nine SRDs, the audit holding their edges, and the cross-chapter label decision (GH-1 through GH-13).'
+
+  - id: rel00.1
+    version: "00.1"
+    use_cases:
+      - id: rel00.1-uc001-prose-chapter-to-fragment
+        summary: A prose chapter converts to a LaTeX fragment.
+        status: done
+      - id: rel00.1-uc002-cross-chapter-label-collisions
+        summary: A pipeline finds the identifiers two chapters both claim.
+        status: done
+    name: Text core
+    status: complete
+    units:
+      - srd002-renderer-core
+      - srd003-escaping
+      - srd006-citations
+      - srd007-passthrough
+    gate: 'none (opens implementation). Converts a prose chapter end to end: headings with derived labels and the collision check over label reports, paragraphs through the escaper, citations, and raw LaTeX passthrough. A chapter carrying a figure or table errors as an unmapped construct until rel00.2 lands.'
+
+  - id: rel00.2
+    version: "00.2"
+    use_cases:
+      - id: rel00.2-uc001-floats-in-two-columns
+        summary: Figures and tables written in native markdown render as floats.
+        status: done
+    name: Floats
+    status: complete
+    units:
+      - srd004-figures
+      - srd005-tables
+      - srd009-backport-compatibility
+    gate: 'rel00.1 complete (floats render inside the chapter walk). Figures and tables land together with the backport constraint verified across their output, because srd009-backport-compatibility is a bar on what the float renderers may emit rather than a component that can trail them.'
+
+  - id: rel00.3
+    version: "00.3"
+    use_cases:
+      - id: rel00.3-uc001-compilable-document
+        summary: The fragments assemble into a document that compiles.
+        status: done
+    name: Document shell
+    status: complete
+    units:
+      - srd001-front-matter
+      - srd008-container
+    gate: 'rel00.1 complete (the abstract and the title-page body convert through the chapter path). Front matter and the container land together; each references the other and neither is usable alone.'
+
+  - id: rel01.0
+    version: "01.0"
+    name: Pipeline adoption
+    status: complete
+    units: []
+    gate: 'rel00.3 complete. Validation only: a gap found here files back into the SRD it belongs to. The library half is done -- every stated requirement is named by a passing test, the audit gates that from here on, and a fixture manuscript converts end to end against committed expectations. The adoption half is cross-repo and cannot close here: paperkit consuming the library for one paper is petar-djukic/autogenic-systems#468.'
+
+  - id: rel02.0
+    version: "02.0"
+    use_cases:
+      - id: rel02.0-uc001-parse-and-render-over-http
+        summary: A mesh parses its corpus and a pipeline renders a paper over HTTP.
+        status: done
+    name: Standalone service
+    status: complete
+    units:
+      - srd010-service
+    gate: 'rel01.0 complete. The service is a command over the unchanged library: parse with rune offsets for the corpus importer in agentic-wiki-mesh, convert and render for the pipeline, on a TeX Live image whose smoke compiles the fixture manuscript. Filed as GH-53 for petar-djukic/agentic-wiki-mesh#14.'
