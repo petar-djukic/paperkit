@@ -2,7 +2,7 @@
 // outline (GH-94, ported from gen_outline.py in GH-217).
 //
 // Render reads <docs>/../00-title-page.md (the title of record and the abstract's
-// source of record), <docs>/VISION.yaml (goals) and <docs>/srd/*.yaml (units in
+// source of record), <docs>/VISION.md (goals) and <docs>/srd/*.md (units in
 // reading order) and emits a two-column IEEEtran outline document: per unit,
 // its goal sentence and the specific subgoals (each with an id G<n>.<m>
 // pointing at paper goal G<n>), and its content (the objective as a lead-in,
@@ -72,36 +72,24 @@ func okey(u string) (int, int) {
 	return major, minor
 }
 
-// VisionPath finds the paper's VISION document, in either form.
+// VisionPath finds the paper's VISION document. A VISION.yaml is the retired
+// form: it is an error rather than ignored, so a paper that was never
+// converted fails loudly instead of rendering with no goals.
 func VisionPath(docs string) (string, error) {
-	yamlPath, mdPath := filepath.Join(docs, "VISION.yaml"), filepath.Join(docs, "VISION.md")
-	_, yamlErr := os.Stat(yamlPath)
-	_, mdErr := os.Stat(mdPath)
-	switch {
-	case yamlErr == nil && mdErr == nil:
-		return "", fmt.Errorf("%s and %s both exist; keep one", yamlPath, mdPath)
-	case mdErr == nil:
-		return mdPath, nil
+	if _, err := os.Stat(filepath.Join(docs, "VISION.yaml")); err == nil {
+		return "", fmt.Errorf("%s: YAML is the retired form; convert with paperkit v0.20261107.5's cmd/srd2md", filepath.Join(docs, "VISION.yaml"))
 	}
-	return yamlPath, nil
+	return filepath.Join(docs, "VISION.md"), nil
 }
 
-// SRDPaths lists the paper's SRD files, in either form, sorted by name. A
-// document present in both forms is an error: the outline would otherwise
-// read whichever sorted last.
+// SRDPaths lists the paper's SRD files, sorted by name. An SRD still in YAML
+// is an error rather than skipped: skipping it would drop its section from
+// the outline without a word.
 func SRDPaths(docs string) ([]string, error) {
-	yamlFiles, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.yaml"))
-	mdFiles, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.md"))
-	stems := map[string]bool{}
-	for _, f := range yamlFiles {
-		stems[strings.TrimSuffix(f, ".yaml")] = true
+	if stale, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.yaml")); len(stale) > 0 {
+		return nil, fmt.Errorf("%d SRD(s) in the retired YAML form, %s first; convert with paperkit v0.20261107.5's cmd/srd2md", len(stale), stale[0])
 	}
-	for _, f := range mdFiles {
-		if stems[strings.TrimSuffix(f, ".md")] {
-			return nil, fmt.Errorf("%s exists as both .yaml and .md; keep one", strings.TrimSuffix(f, ".md"))
-		}
-	}
-	files := append(yamlFiles, mdFiles...)
+	files, _ := filepath.Glob(filepath.Join(docs, "srd", "srd-*.md"))
 	sort.Strings(files)
 	return files, nil
 }
@@ -177,7 +165,7 @@ func emitMarkdown(vis map[string]interface{}, units []string, srds map[string]ma
 	var out []string
 	w := func(lines ...string) { out = append(out, lines...) }
 
-	w("<!-- Generated from docs/srd/*.yaml by cmd/genoutline -format md;")
+	w("<!-- Generated from docs/srd/*.md by cmd/genoutline -format md;")
 	w("     regenerate with `mage outline`. Edit the SRDs, not this file. -->")
 
 	for _, u := range units {
@@ -333,7 +321,7 @@ const (
 )
 
 // Render generates the outline of the paper whose docs directory (holding
-// VISION and srd/, in either form) is docs.
+// VISION.md and srd/) is docs.
 func Render(docs string, format Format) ([]byte, error) {
 	if format != TeX && format != Markdown {
 		return nil, fmt.Errorf("outline format %q: want %q or %q", format, TeX, Markdown)

@@ -1,6 +1,6 @@
 # SRD markdown format
 
-A section requirements document (SRD) states what one section of a paper is committed to saying: its goal, the subgoals it serves, the points it makes, the tables and figures it carries. A paper's `docs/VISION` states the goals of the whole paper. Both are written as markdown in the form below, which `srd.Load` reads into the same map a YAML document decodes to. genoutline, specs checks, and anything else built on `Load` work on either form unchanged.
+A section requirements document (SRD) states what one section of a paper is committed to saying: its goal, the subgoals it serves, the points it makes, the tables and figures it carries. A paper's `docs/VISION` states the goals of the whole paper. Both are written as markdown in the form below, which `srd.Load` reads into a plain map of fields. genoutline, the tutorial's specs check, and anything else built on `Load` work on that map.
 
 The form follows the convention the declarative-agents specification corpus settled on: YAML front matter carries identity, and an HTML comment of the form `<!-- field: name -->` above each heading names the field the section holds. Headings are for people. The reader keys on the comment.
 
@@ -101,7 +101,7 @@ Table: the approval stages
 
 **Locks.** `section_goal`, `goals` and `acceptance` are contract values, and their bodies sit inside a block lock (`<!-- lock -->` and `<!-- /lock -->`, each alone on its line). Prose tooling treats a lock region as opaque, which is the protection the YAML backend gave these keys by excluding them.
 
-**Text.** A value is its words: the reader collapses runs of ASCII whitespace, so line wrapping is free. Two documents are equal when their maps are equal after that collapse (`srd.Normalize`). Unicode spaces are content: the narrow no-break space (U+202F) the papers set before numbers survives.
+**Text.** A value is its words: the reader collapses runs of ASCII whitespace, so line wrapping is free. Two documents are equal when their maps are equal after that collapse. Unicode spaces are content: the narrow no-break space (U+202F) the papers set before numbers survives.
 
 ### SRD fields
 
@@ -130,8 +130,8 @@ A field the schema does not name is an error in both directions, and so is a rec
 
 ### What a say may not be
 
-A say that holds its own `[@...]` group would have it absorbed into `carried_by`, and a say opening with a list, heading, quote, table or comment marker would not read back as a paragraph. The writer rejects both, and an empty `carried_by`, whose key should simply be dropped.
+A say that holds its own `[@...]` group would have it absorbed into `carried_by`, and a say opening with a list, heading, quote, table or comment marker would not read back as a paragraph. Write neither; a content item with no citations simply has no group.
 
-## Converting
+## History
 
-`cmd/srd2md` converts a paper's `docs/srd/srd-*.yaml` and `docs/VISION.yaml`. It parses each markdown result back and compares it with the YAML before writing anything. `-check` verifies without writing.
+The papers' SRDs were first written in YAML. paperkit v0.20261107.5's `cmd/srd2md` converted every corpus, verifying each document before it wrote, and later releases read only the markdown form: a `.yaml` SRD or VISION left in a paper is an error, not silently skipped. Convert a straggler with that release.
