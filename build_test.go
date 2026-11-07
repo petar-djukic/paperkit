@@ -262,3 +262,51 @@ func TestCheckMissingCharsIgnoresAnAbsentLog(t *testing.T) {
 		t.Errorf("CheckMissingChars() = %v, want nil when there is no log", err)
 	}
 }
+
+// fakeLatexmk puts a latexmk on PATH that records its arguments and writes the
+// PDF its job name implies, so the compile wiring is testable without TeX.
+func fakeLatexmk(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	record := filepath.Join(dir, "args")
+	script := "#!/bin/sh\necho \"$@\" >> " + record + "\n" +
+		"for a; do case $a in -outdir=*) out=${a#-outdir=};; -jobname=*) job=${a#-jobname=};; esac; done\n" +
+		"mkdir -p \"$out\" && : > \"$out/$job.pdf\" && : > \"$out/$job.log\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "latexmk"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return record
+}
+
+// The paper and its outline take distinct job names, so the paper's recursive
+// search path cannot adopt the outline's main.bbl as its own bibliography.
+func TestLatexmkNamesEachDocumentsJob(t *testing.T) {
+	record := fakeLatexmk(t)
+	root, config := buildFixture(t)
+	writeFile(t, root, "tex/main.tex", "")
+	writeFile(t, root, "tex-outline/main.tex", "")
+
+	if err := PDF(root, config); err != nil {
+		t.Fatalf("PDF() error: %v", err)
+	}
+	if err := latexmk(filepath.Join(root, "tex-outline"), filepath.Join(root, "build", "outline"),
+		"main.tex", "outline", "outline.pdf", "templates:"); err != nil {
+		t.Fatalf("latexmk() for the outline: %v", err)
+	}
+
+	args := readFile(t, filepath.Dir(record), "args")
+	lines := strings.Split(strings.TrimSpace(args), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], "-jobname=main") || !strings.Contains(lines[1], "-jobname=outline") {
+		t.Errorf("latexmk calls = %q, want the paper as main and the outline as outline", lines)
+	}
+	if _, err := os.Stat(filepath.Join(root, "build", config.Output)); err != nil {
+		t.Errorf("the paper's PDF was not named %s: %v", config.Output, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "build", "outline", "outline.pdf")); err != nil {
+		t.Errorf("the outline's PDF is missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "build", "outline", "main.pdf")); err == nil {
+		t.Error("the outline compiled under the paper's job name")
+	}
+}

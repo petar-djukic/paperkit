@@ -95,16 +95,20 @@ func PDF(root string, config Config) error {
 	// -outdir a parent-relative \graphicspath stops resolving, so the search
 	// path moves instead of the output.
 	return latexmk(filepath.Join(root, config.TexDir), filepath.Join(root, config.BuildDir),
-		"main.tex", config.Output, absoluteRoot+"//:")
+		"main.tex", "main", config.Output, absoluteRoot+"//:")
 }
 
-// latexmk compiles source, a file in texDir, with xelatex, landing the aux
-// files and the PDF in buildDir, and names the PDF output. texinputs is the
-// TeX search path. The source is named relative to texDir: a recursive search
-// path can otherwise resolve a bare name to another tex directory's file of
-// the same name when a paper builds more than one (the md outline compiles as
-// a one-chapter paper with its own tex directory).
-func latexmk(texDir, buildDir, source, output, texinputs string) error {
+// latexmk compiles source, a file in texDir, with xelatex under jobname,
+// landing the aux files and the PDF in buildDir, and names the PDF output.
+// texinputs is the TeX search path.
+//
+// The paper compiles with a recursive search of its whole directory, which
+// reaches every build output under it. Each document a paper builds therefore
+// takes its own job name: under a shared one, the paper's first pass finds the
+// outline's main.bbl and adopts it as its own bibliography. For the same
+// reason the source is named relative to texDir, not as a bare name another
+// tex directory also holds.
+func latexmk(texDir, buildDir, source, jobname, output, texinputs string) error {
 	if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		return err
 	}
@@ -114,21 +118,20 @@ func latexmk(texDir, buildDir, source, output, texinputs string) error {
 	}
 	command := exec.Command("latexmk",
 		"-xelatex", "-interaction=nonstopmode", "-halt-on-error",
-		"-outdir="+outDir, "./"+source)
+		"-outdir="+outDir, "-jobname="+jobname, "./"+source)
 	command.Dir = texDir
 	command.Env = append(os.Environ(), "TEXINPUTS="+texinputs)
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	stem := strings.TrimSuffix(source, filepath.Ext(source))
-	logPath := filepath.Join(buildDir, stem+".log")
+	logPath := filepath.Join(buildDir, jobname+".log")
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("latexmk: %w%s", err, logTail(logPath))
 	}
 	if err := CheckMissingChars(logPath); err != nil {
 		return err
 	}
-	if output != "" && output != stem+".pdf" {
-		return os.Rename(filepath.Join(buildDir, stem+".pdf"), filepath.Join(buildDir, output))
+	if output != "" && output != jobname+".pdf" {
+		return os.Rename(filepath.Join(buildDir, jobname+".pdf"), filepath.Join(buildDir, output))
 	}
 	return nil
 }
