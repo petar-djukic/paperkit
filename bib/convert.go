@@ -211,6 +211,10 @@ func Convert(yamlPath, outPath string) (int, error) {
 		return 0, fmt.Errorf("%s is not a CSL-YAML list of references: %w", yamlPath, err)
 	}
 
+	for _, id := range genericArticleVenues(entries) {
+		fmt.Fprintf(os.Stderr, "refs2bib: %s has CSL type article and a venue; pandoc writes it as @misc and drops the venue (use article-journal or paper-conference)\n", id)
+	}
+
 	for _, entry := range entries {
 		for _, field := range dateFields {
 			if v, has := entry[field]; has {
@@ -251,5 +255,85 @@ func Convert(yamlPath, outPath string) (int, error) {
 	if err := protectAccentedInitials(outPath); err != nil {
 		return 0, err
 	}
+	if err := reportInstitutions(outPath); err != nil {
+		return 0, err
+	}
 	return len(entries), nil
+}
+
+// genericArticleVenues names the entries whose CSL type is the generic
+// "article" but which carry a venue that is not a preprint server.
+//
+// pandoc writes a CSL "article" as @misc and drops its container-title, which
+// is right for a preprint and wrong for a journal or conference paper: the
+// printed reference loses its venue. The fix is in the corpus (type
+// article-journal or paper-conference), so this only names the entries.
+func genericArticleVenues(entries []map[string]interface{}) []string {
+	var ids []string
+	for _, entry := range entries {
+		if entry["type"] != "article" {
+			continue
+		}
+		venue, _ := entry["container-title"].(string)
+		venue = strings.TrimSpace(venue)
+		if venue == "" || strings.HasPrefix(strings.ToLower(venue), "arxiv") {
+			continue
+		}
+		id, _ := entry["id"].(string)
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// techreportField matches the start of one field line inside a BibTeX entry
+// as pandoc writes it: two spaces, the field name, " = ".
+var techreportField = regexp.MustCompile(`^  ([a-z]+) = `)
+
+// reportInstitutions renames publisher to institution in every @techreport
+// entry of the generated BibTeX.
+//
+// CSL has no institution variable, so pandoc writes the issuing body of a CSL
+// "report" as publisher. BibTeX's @techreport requires institution, and
+// IEEEtranN warns "missing institution" and prints the report without it.
+// Like protectAccentedInitials this runs on the file after pandoc, since
+// pandoc offers no mapping for it. An entry that already has an institution
+// is left alone.
+func reportInstitutions(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	changed := false
+	for start := 0; start < len(lines); start++ {
+		if !strings.HasPrefix(lines[start], "@techreport{") {
+			continue
+		}
+		end := start + 1
+		for end < len(lines) && lines[end] != "}" {
+			end++
+		}
+		publisher, hasInstitution := -1, false
+		for i := start + 1; i < end; i++ {
+			m := techreportField.FindStringSubmatch(lines[i])
+			if m == nil {
+				continue
+			}
+			switch m[1] {
+			case "publisher":
+				publisher = i
+			case "institution":
+				hasInstitution = true
+			}
+		}
+		if publisher >= 0 && !hasInstitution {
+			lines[publisher] = strings.Replace(lines[publisher], "  publisher = ", "  institution = ", 1)
+			changed = true
+		}
+		start = end
+	}
+	if !changed {
+		return nil
+	}
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644)
 }

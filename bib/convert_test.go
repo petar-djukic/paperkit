@@ -96,3 +96,79 @@ func TestProtectAccentedInitialsLeavesAnASCIIOnlyFileUntouched(t *testing.T) {
 		t.Errorf("an ASCII-only file was rewritten:\n%s", got)
 	}
 }
+
+func TestReportInstitutionsRenamesPublisherInTechreports(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "references.bib")
+	// A report pandoc wrote from CSL (publisher), one that already names its
+	// institution, and a book whose publisher must stay a publisher.
+	source := `@techreport{feiler-2006,
+  author = {Feiler, Peter H. and Gluch, David P.},
+  publisher = {Software Engineering Institute, Carnegie Mellon
+    University},
+  title = {The {AADL}},
+  number = {CMU/SEI-2006-TN-011},
+  year = {2006}
+}
+@techreport{both,
+  institution = {Kept},
+  publisher = {Also kept},
+  title = {Both}
+}
+@book{fowler,
+  author = {Fowler, Martin},
+  publisher = {Addison-Wesley},
+  title = {Domain-Specific Languages}
+}
+`
+	if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := reportInstitutions(path); err != nil {
+		t.Fatalf("reportInstitutions() error: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "  institution = {Software Engineering Institute, Carnegie Mellon\n    University},") {
+		t.Errorf("the report's publisher was not renamed, or its wrapped value changed:\n%s", text)
+	}
+	if !strings.Contains(text, "  institution = {Kept},\n  publisher = {Also kept},") {
+		t.Errorf("an entry that already had an institution was altered:\n%s", text)
+	}
+	if !strings.Contains(text, "  publisher = {Addison-Wesley},") {
+		t.Errorf("a book's publisher was renamed:\n%s", text)
+	}
+}
+
+func TestReportInstitutionsLeavesAFileWithoutReportsUntouched(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "references.bib")
+	source := "@book{fowler,\n  publisher = {Addison-Wesley},\n  title = {DSLs}\n}\n"
+	if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(path)
+	if err := reportInstitutions(path); err != nil {
+		t.Fatalf("reportInstitutions() error: %v", err)
+	}
+	after, _ := os.Stat(path)
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Errorf("a file with no @techreport entry was rewritten")
+	}
+}
+
+func TestGenericArticleVenuesNamesJournalPapersTypedAsArticle(t *testing.T) {
+	entries := []map[string]interface{}{
+		{"id": "journal", "type": "article", "container-title": "Science of Computer Programming"},
+		{"id": "preprint", "type": "article", "container-title": "arXiv preprint arXiv:2308.00352"},
+		{"id": "bare", "type": "article"},
+		{"id": "typed", "type": "article-journal", "container-title": "Computer"},
+	}
+	got := genericArticleVenues(entries)
+	if len(got) != 1 || got[0] != "journal" {
+		t.Errorf("genericArticleVenues() = %v, want [journal]", got)
+	}
+}
