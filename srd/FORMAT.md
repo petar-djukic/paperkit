@@ -1,6 +1,6 @@
 # SRD markdown format
 
-A section requirements document (SRD) states what one section of a paper is committed to saying: its goal, the subgoals it serves, the points it makes, the tables and figures it carries. A paper's `docs/VISION` states the goals of the whole paper. Both are written as markdown in the form below, which `srd.Load` reads into a plain map of fields. genoutline, the tutorial's specs check, and anything else built on `Load` work on that map.
+A section requirements document (SRD) states what one section of a paper is committed to saying: its goal, the subgoals it serves, the points it makes, the tables and figures it carries. A paper's vision states the goals of the whole paper. It is `docs/VISION.md`, or `docs/PAPER-VISION.md` in a repository whose own tooling gives `docs/VISION.md` another meaning; `srd.VisionPath` reads the second when it exists and refuses a directory that holds both. Both are written as markdown in the form below, which `srd.Load` reads into a plain map of fields. genoutline, the tutorial's specs check, and anything else built on `Load` work on that map.
 
 The form follows the convention the declarative-agents specification corpus settled on: YAML front matter carries identity, and an HTML comment of the form `<!-- field: name -->` above each heading names the field the section holds. Headings are for people. The reader keys on the comment.
 

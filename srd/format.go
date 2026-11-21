@@ -21,13 +21,14 @@ type DocKind int
 const (
 	// SRDDoc is a section requirements document, docs/srd/srd-*.
 	SRDDoc DocKind = iota
-	// VisionDoc is a paper's docs/VISION.
+	// VisionDoc is a paper's vision, docs/VISION.md or docs/PAPER-VISION.md.
 	VisionDoc
 )
 
 // KindOf infers the document type from the file name.
 func KindOf(path string) DocKind {
-	if strings.HasPrefix(filepath.Base(path), "VISION.") {
+	base := filepath.Base(path)
+	if strings.HasPrefix(base, "VISION.") || strings.HasPrefix(base, "PAPER-VISION.") {
 		return VisionDoc
 	}
 	return SRDDoc
