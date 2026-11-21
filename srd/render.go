@@ -2,7 +2,7 @@
 // outline (GH-94, ported from gen_outline.py in GH-217).
 //
 // Render reads <docs>/../00-title-page.md (the title of record and the abstract's
-// source of record), <docs>/VISION.md (goals) and <docs>/srd/*.md (units in
+// source of record), the vision VisionPath finds (goals) and <docs>/srd/*.md (units in
 // reading order) and emits a two-column IEEEtran outline document: per unit,
 // its goal sentence and the specific subgoals (each with an id G<n>.<m>
 // pointing at paper goal G<n>), and its content (the objective as a lead-in,
@@ -72,14 +72,32 @@ func okey(u string) (int, int) {
 	return major, minor
 }
 
-// VisionPath finds the paper's VISION document. A VISION.yaml is the retired
-// form: it is an error rather than ignored, so a paper that was never
-// converted fails loudly instead of rendering with no goals.
+// PaperVisionName is the name a paper gives its vision when the repository
+// around it gives docs/VISION.md another meaning: a corpus gate that types
+// every docs/VISION.md as a program vision in its own format would refuse the
+// paper's. VisionName is the house name, read when the other is absent.
+const (
+	PaperVisionName = "PAPER-VISION.md"
+	VisionName      = "VISION.md"
+)
+
+// VisionPath finds the paper's vision document: PAPER-VISION.md when the docs
+// directory holds one, VISION.md otherwise. A directory holding both is an
+// error, since nothing says which one the outline renders. A VISION.yaml is
+// the retired form: it is an error rather than ignored, so a paper that was
+// never converted fails loudly instead of rendering with no goals.
 func VisionPath(docs string) (string, error) {
 	if _, err := os.Stat(filepath.Join(docs, "VISION.yaml")); err == nil {
 		return "", fmt.Errorf("%s: YAML is the retired form; convert with paperkit v0.20261107.5's cmd/srd2md", filepath.Join(docs, "VISION.yaml"))
 	}
-	return filepath.Join(docs, "VISION.md"), nil
+	paper, house := filepath.Join(docs, PaperVisionName), filepath.Join(docs, VisionName)
+	if _, err := os.Stat(paper); err != nil {
+		return house, nil
+	}
+	if _, err := os.Stat(house); err == nil {
+		return "", fmt.Errorf("%s holds both %s and %s; keep one", docs, PaperVisionName, VisionName)
+	}
+	return paper, nil
 }
 
 // SRDPaths lists the paper's SRD files, sorted by name. An SRD still in YAML

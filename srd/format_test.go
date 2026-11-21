@@ -238,3 +238,31 @@ func TestRetiredYAMLIsAnError(t *testing.T) {
 		t.Error("Load() read a YAML document")
 	}
 }
+
+func TestVisionPathPrefersThePaperName(t *testing.T) {
+	docs := t.TempDir()
+	house, paper := filepath.Join(docs, VisionName), filepath.Join(docs, PaperVisionName)
+	if got, err := VisionPath(docs); err != nil || got != house {
+		t.Errorf("VisionPath() with neither file = %q, %v; want %q", got, err, house)
+	}
+	if err := os.WriteFile(paper, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := VisionPath(docs); err != nil || got != paper {
+		t.Errorf("VisionPath() with %s = %q, %v; want %q", PaperVisionName, got, err, paper)
+	}
+	if err := os.WriteFile(house, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := VisionPath(docs); err == nil || !strings.Contains(err.Error(), "both") {
+		t.Errorf("VisionPath() with both files = %v, want it to refuse both", err)
+	}
+	for _, name := range []string{VisionName, PaperVisionName} {
+		if KindOf(filepath.Join(docs, name)) != VisionDoc {
+			t.Errorf("KindOf(%s) is not a vision document", name)
+		}
+	}
+	if KindOf(filepath.Join(docs, "srd", "srd-1-introduction.md")) != SRDDoc {
+		t.Error("KindOf(srd-1-introduction.md) is not an SRD")
+	}
+}
